@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/config/auth.php';
+require_once __DIR__ . '/config/mailer.php';
 
 if (isLoggedIn()) {
     header('Location: dashboard.php');
@@ -12,19 +13,27 @@ $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = sanitize($_POST['name'] ?? '');
-    $email = filter_var(sanitize($_POST['email'] ?? ''), FILTER_VALIDATE_EMAIL);
+    $rawEmail = sanitize($_POST['email'] ?? '');
     $phone = sanitize($_POST['phone'] ?? '');
     $password = $_POST['password'] ?? '';
     $confirm_password = $_POST['confirm_password'] ?? '';
     $city = sanitize($_POST['city'] ?? '');
 
-    if (empty($name) || !$email || empty($phone) || empty($password) || empty($city)) {
+    // Strict Email Address Validation
+    $emailCheck = validateEmailAddress($rawEmail);
+
+    if (empty($name) || empty($rawEmail) || empty($phone) || empty($password) || empty($city)) {
         $error = 'Please fill out all required fields with valid details.';
+    } elseif (!$emailCheck['valid']) {
+        $error = $emailCheck['error'];
+    } elseif (strlen(preg_replace('/[^0-9]/', '', $phone)) < 10) {
+        $error = 'Please enter a valid 10-digit mobile number.';
     } elseif (strlen($password) < 6) {
         $error = 'Password must be at least 6 characters long.';
     } elseif ($password !== $confirm_password) {
         $error = 'Passwords do not match.';
     } else {
+        $email = $emailCheck['email'];
         $db = getDB();
         $checkStmt = $db->prepare("SELECT id FROM users WHERE email = ? LIMIT 1");
         $checkStmt->execute([$email]);
@@ -36,8 +45,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
                 $stmt->execute([$name, $email, $phone, $hashedPassword, $city]);
                 $newUserId = $db->lastInsertId();
+
+                // Send Welcome Email
+                sendWelcomeEmail($email, $name);
+
                 $_SESSION['user_id'] = $newUserId;
-                setFlash('success', 'Welcome to Food Bridge, ' . htmlspecialchars($name) . '! Your account has been created.');
+                setFlash('success', 'Welcome to Food Bridge, ' . htmlspecialchars($name) . '! Your account is ready.');
                 header('Location: dashboard.php');
                 exit;
             } catch (PDOException $e) {

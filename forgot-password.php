@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/config/auth.php';
+require_once __DIR__ . '/config/mailer.php';
 
 if (isLoggedIn()) {
     header('Location: dashboard.php');
@@ -11,32 +12,64 @@ $error = '';
 $flash = getFlash();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $identifier = sanitize($_POST['identifier'] ?? '');
+    $rawIdentifier = sanitize($_POST['identifier'] ?? '');
 
-    if (empty($identifier)) {
+    if (empty($rawIdentifier)) {
         $error = 'Please enter your registered email address or mobile number.';
     } else {
-        $db = getDB();
-        $stmt = $db->prepare("SELECT id, name, email, phone FROM users WHERE email = ? OR phone = ? OR phone LIKE ? LIMIT 1");
-        $cleanPhone = preg_replace('/[^0-9]/', '', $identifier);
-        $phonePattern = '%' . (strlen($cleanPhone) >= 10 ? substr($cleanPhone, -10) : $cleanPhone) . '%';
-        $stmt->execute([$identifier, $identifier, $phonePattern]);
-        $user = $stmt->fetch();
+        $isEmail = str_contains($rawIdentifier, '@');
+        $identifier = $rawIdentifier;
 
-        if ($user) {
-            $otp = str_pad((string)mt_rand(100000, 999999), 6, '0', STR_PAD_LEFT);
-            $expiresAt = date('Y-m-d H:i:s', strtotime('+15 minutes'));
+        // Strict Email validation if input looks like an email
+        if ($isEmail) {
+            $validation = validateEmailAddress($rawIdentifier);
+            if (!$validation['valid']) {
+                $error = $validation['error'];
+            } else {
+                $identifier = $validation['email'];
+            }
+        }
 
-            $ins = $db->prepare("INSERT INTO password_resets (identifier, otp, is_verified, expires_at) VALUES (?, ?, 0, ?)");
-            $ins->execute([$identifier, $otp, $expiresAt]);
+        if (empty($error)) {
+            $db = getDB();
+            $stmt = $db->prepare("SELECT id, name, email, phone FROM users WHERE email = ? OR phone = ? OR phone LIKE ? LIMIT 1");
+            $cleanPhone = preg_replace('/[^0-9]/', '', $identifier);
+            $phonePattern = '%' . (strlen($cleanPhone) >= 10 ? substr($cleanPhone, -10) : $cleanPhone) . '%';
+            $stmt->execute([$identifier, $identifier, $phonePattern]);
+            $user = $stmt->fetch();
 
-            $_SESSION['reset_identifier'] = $identifier;
-            $_SESSION['demo_otp'] = $otp; // Saved for friendly demo display on verify screen
-            setFlash('info', "A 6-digit verification code has been generated. (Demo Code: <strong>{$otp}</strong>)");
-            header('Location: verify-otp.php');
-            exit;
-        } else {
-            $error = 'No registered Food Bridge account found with that email or phone number.';
+            if ($user) {
+                // Generate 6-digit secure numeric OTP
+                $otp = str_pad((string)random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
+                $expiresAt = date('Y-m-d H:i:s', strtotime('+15 minutes'));
+
+                // Invalidate any existing unused OTPs for this email
+                $db->prepare("UPDATE password_resets SET is_verified = 2 WHERE identifier = ? AND is_verified = 0")->execute([$user['email']]);
+
+                // Store new OTP
+                $ins = $db->prepare("INSERT INTO password_resets (identifier, otp, is_verified, expires_at) VALUES (?, ?, 0, ?)");
+                $ins->execute([$user['email'], $otp, $expiresAt]);
+
+                // Dispatch OTP email to user's registered email
+                $mailSent = sendOtpEmail($user['email'], $user['name'], $otp, 'Password Recovery');
+
+                $_SESSION['reset_identifier'] = $user['email'];
+                $_SESSION['reset_name'] = $user['name'];
+                $_SESSION['reset_user_id'] = $user['id'];
+                $_SESSION['reset_otp_time'] = time();
+                $_SESSION['demo_otp'] = $otp;
+
+                $masked = maskEmail($user['email']);
+                if ($mailSent) {
+                    setFlash('info', "A 6-digit verification code has been dispatched to <strong>{$masked}</strong>. Please check your inbox and spam folder.");
+                } else {
+                    setFlash('info', "A 6-digit verification code has been generated for <strong>{$masked}</strong>. (Verification code: <strong>{$otp}</strong>).");
+                }
+                header('Location: verify-otp.php');
+                exit;
+            } else {
+                $error = 'No registered Food Bridge account found with that email or mobile number.';
+            }
         }
     }
 }
@@ -73,9 +106,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <div class="container recovery-container">
         <section class="recovery-card forgot-card" aria-labelledby="forgot-heading">
           <a class="back-link" href="login.php"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Back to Login</a>
-          <div class="recovery-icon"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span><i class="fa-solid fa-check" aria-hidden="true"></i></span></div>
+          <div class="recovery-icon"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span><i class="fa-solid fa-envelope" aria-hidden="true"></i></span></div>
           <h1 id="forgot-heading">Forgot Password?</h1>
-          <p class="recovery-description">Enter your registered email address or mobile number to receive a 6-digit verification OTP.</p>
+          <p class="recovery-description">Enter your registered email address or mobile number to receive a 6-digit verification code directly to your email.</p>
 
           <?php if (!empty($error)): ?>
             <div style="background: #fde8e8; color: #9b1c1c; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 0.9rem; border: 1px solid #f8b4b4;">
@@ -83,17 +116,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
           <?php endif; ?>
 
+          <?php if ($flash): ?>
+            <div style="background: #def7ec; color: #03543f; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 0.9rem; border: 1px solid #bcf0da;">
+              <i class="fa-solid fa-circle-info"></i> <?php echo $flash['message']; ?>
+            </div>
+          <?php endif; ?>
+
           <form class="auth-form recovery-form" method="POST" action="forgot-password.php" novalidate>
             <label class="field-label" for="recovery-identifier">Registered Email or Mobile Number <span>*</span></label>
             <div class="input-wrap">
               <i class="fa-solid fa-at" aria-hidden="true"></i>
-              <input id="recovery-identifier" name="identifier" type="text" placeholder="e.g. dhruv.gohel@example.com" value="<?php echo htmlspecialchars($_POST['identifier'] ?? 'dhruv.gohel@example.com'); ?>" required />
+              <input id="recovery-identifier" name="identifier" type="text" placeholder="e.g. name@gmail.com" value="<?php echo htmlspecialchars($_POST['identifier'] ?? ''); ?>" required />
             </div>
-            <button class="button button-green auth-submit" type="submit">Send Verification OTP <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
+            <button class="button button-green auth-submit" type="submit">Send Verification Code <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
             <p class="form-message" role="status" aria-live="polite"></p>
           </form>
           <p class="recovery-switch">Remember your password? <a href="login.php">Login <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a></p>
-          <div class="recovery-security"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>Account recovery is protected by timed single-use security tokens.</span></div>
+          <div class="recovery-security"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>Account recovery is protected with single-use, 15-minute OTP tokens delivered to verified email addresses.</span></div>
         </section>
         <div style="text-align: center; margin-top: 24px; color: #71807d; font-size: 0.85rem;">
           <p>© <?php echo date('Y'); ?> Food Bridge. All rights reserved. • Developed with <i class="fa-solid fa-heart" style="color: #e25555;"></i> by <strong>Team EtherX</strong></p>

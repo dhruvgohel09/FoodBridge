@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/config/auth.php';
+require_once __DIR__ . '/config/mailer.php';
 
 if (isLoggedIn()) {
     header('Location: dashboard.php');
@@ -8,6 +9,15 @@ if (isLoggedIn()) {
 }
 
 $identifier = $_SESSION['reset_identifier'] ?? '';
+$isVerified = !empty($_SESSION['otp_verified']);
+
+// Strict security check: must have verified OTP first
+if (!$isVerified || empty($identifier)) {
+    setFlash('error', 'Please request and verify your 6-digit OTP code before resetting your password.');
+    header('Location: forgot-password.php');
+    exit;
+}
+
 $error = '';
 $flash = getFlash();
 
@@ -20,27 +30,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (strlen($password) < 6) {
         $error = 'Password must be at least 6 characters long.';
     } elseif ($password !== $confirm_password) {
-        $error = 'Passwords do not match.';
+        $error = 'Passwords do not match. Please re-enter.';
     } else {
         $db = getDB();
         $hashed = password_hash($password, PASSWORD_DEFAULT);
 
-        if (!empty($identifier)) {
-            $stmt = $db->prepare("UPDATE users SET password = ? WHERE email = ? OR phone = ? OR phone LIKE ?");
-            $cleanPhone = preg_replace('/[^0-9]/', '', $identifier);
-            $phonePattern = '%' . (strlen($cleanPhone) >= 10 ? substr($cleanPhone, -10) : $cleanPhone) . '%';
-            $stmt->execute([$hashed, $identifier, $identifier, $phonePattern]);
-        } else {
-            // Fallback for demo user if reached directly
-            $stmt = $db->prepare("UPDATE users SET password = ? WHERE id = 1");
-            $stmt->execute([$hashed]);
+        $stmt = $db->prepare("UPDATE users SET password = ? WHERE email = ? OR phone = ?");
+        $stmt->execute([$hashed, $identifier, $identifier]);
+
+        // Fetch user name for personalized security alert email
+        $userStmt = $db->prepare("SELECT name, email FROM users WHERE email = ? OR phone = ? LIMIT 1");
+        $userStmt->execute([$identifier, $identifier]);
+        $userData = $userStmt->fetch();
+
+        if ($userData) {
+            sendPasswordChangedEmail($userData['email'], $userData['name']);
         }
 
+        // Clean up password reset session data
         unset($_SESSION['reset_identifier']);
+        unset($_SESSION['reset_name']);
+        unset($_SESSION['reset_user_id']);
         unset($_SESSION['demo_otp']);
         unset($_SESSION['otp_verified']);
+        unset($_SESSION['reset_otp_time']);
 
-        setFlash('success', 'Your password has been successfully reset! You can now log in with your new password.');
+        setFlash('success', 'Your password has been successfully reset! You can now log in with your new credentials.');
         header('Location: login.php');
         exit;
     }
@@ -95,19 +110,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <?php endif; ?>
 
           <form class="auth-form recovery-form reset-form" method="POST" action="reset-password.php" data-auth-form="reset" novalidate>
-            <label class="field-label" for="new-password">New Password</label>
+            <label class="field-label" for="new-password">New Password <span>*</span></label>
             <div class="input-wrap">
               <i class="fa-solid fa-lock" aria-hidden="true"></i>
               <input id="new-password" name="password" type="password" placeholder="Enter at least 6 characters" autocomplete="new-password" minlength="6" required />
               <button class="password-toggle" type="button" aria-label="Show password" aria-pressed="false"><i class="fa-regular fa-eye" aria-hidden="true"></i></button>
             </div>
-            <label class="field-label" for="confirm-new-password">Confirm New Password</label>
+            <label class="field-label" for="confirm-new-password">Confirm New Password <span>*</span></label>
             <div class="input-wrap">
               <i class="fa-solid fa-lock" aria-hidden="true"></i>
               <input id="confirm-new-password" name="confirm_password" type="password" placeholder="Re-enter your new password" autocomplete="new-password" minlength="6" required />
               <button class="password-toggle" type="button" aria-label="Show password" aria-pressed="false"><i class="fa-regular fa-eye" aria-hidden="true"></i></button>
             </div>
-            <button class="button button-green auth-submit" type="submit">Reset Password &amp; Log In <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
+            <button class="button button-green auth-submit" type="submit">Update Password &amp; Log In <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
             <p class="form-message" role="status" aria-live="polite"></p>
           </form>
           <a class="cancel-link" href="login.php"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Cancel and return to Login</a>

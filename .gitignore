@@ -1,5 +1,7 @@
 # Environment & Logs
 *.log
+logs/*
+!logs/.gitkeep
 .env
 .env.local
 

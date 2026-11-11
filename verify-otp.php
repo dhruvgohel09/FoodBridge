@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/config/auth.php';
+require_once __DIR__ . '/config/mailer.php';
 
 if (isLoggedIn()) {
     header('Location: dashboard.php');
@@ -12,32 +13,82 @@ $demoOtp = $_SESSION['demo_otp'] ?? '';
 $error = '';
 $flash = getFlash();
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $otp = sanitize($_POST['otp'] ?? '');
+// Redirect back to forgot-password if no recovery session exists
+if (empty($identifier)) {
+    setFlash('info', 'Please submit your registered email or mobile number to begin password recovery.');
+    header('Location: forgot-password.php');
+    exit;
+}
 
-    if (empty($otp)) {
-        $error = 'Please enter the 6-digit verification code.';
+// Handle Resend OTP Request
+if (isset($_GET['resend']) && $_GET['resend'] === '1') {
+    $lastSent = $_SESSION['reset_otp_time'] ?? 0;
+    $timeSinceLast = time() - $lastSent;
+    $cooldown = 30; // seconds
+
+    if ($timeSinceLast < $cooldown) {
+        $wait = $cooldown - $timeSinceLast;
+        setFlash('warning', "Please wait {$wait} seconds before requesting another verification code.");
     } else {
         $db = getDB();
-        $stmt = $db->prepare("SELECT id, identifier FROM password_resets WHERE otp = ? AND (identifier = ? OR ? = '') AND is_verified = 0 AND expires_at > NOW() ORDER BY id DESC LIMIT 1");
-        $stmt->execute([$otp, $identifier, $identifier]);
+        $otp = str_pad((string)random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
+        $expiresAt = date('Y-m-d H:i:s', strtotime('+15 minutes'));
+
+        // Invalidate old unverified codes
+        $db->prepare("UPDATE password_resets SET is_verified = 2 WHERE identifier = ? AND is_verified = 0")->execute([$identifier]);
+
+        // Insert new code
+        $db->prepare("INSERT INTO password_resets (identifier, otp, is_verified, expires_at) VALUES (?, ?, 0, ?)")->execute([$identifier, $otp, $expiresAt]);
+
+        $name = $_SESSION['reset_name'] ?? 'Community Member';
+        $sent = sendOtpEmail($identifier, $name, $otp, 'Password Recovery');
+
+        $_SESSION['demo_otp'] = $otp;
+        $_SESSION['reset_otp_time'] = time();
+
+        $masked = maskEmail($identifier);
+        if ($sent) {
+            setFlash('success', "A new 6-digit verification code has been dispatched to <strong>{$masked}</strong>. Please check your inbox and spam folder.");
+        } else {
+            setFlash('info', "A new verification code was generated for <strong>{$masked}</strong>: <strong>{$otp}</strong>.");
+        }
+    }
+    header('Location: verify-otp.php');
+    exit;
+}
+
+// Handle OTP Verification Submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $otp = preg_replace('/[^0-9]/', '', sanitize($_POST['otp'] ?? ''));
+    if (empty($otp) && !empty($_POST['otp_digits']) && is_array($_POST['otp_digits'])) {
+        $otp = preg_replace('/[^0-9]/', '', implode('', $_POST['otp_digits']));
+    }
+
+    if (empty($otp) || strlen($otp) !== 6) {
+        $error = 'Please enter the complete 6-digit verification code.';
+    } else {
+        $db = getDB();
+        $stmt = $db->prepare("SELECT id, identifier FROM password_resets WHERE otp = ? AND identifier = ? AND is_verified = 0 AND expires_at > NOW() ORDER BY id DESC LIMIT 1");
+        $stmt->execute([$otp, $identifier]);
         $record = $stmt->fetch();
 
-        if ($record || $otp === '123456' || ($demoOtp && $otp === $demoOtp)) {
+        if ($record || ($demoOtp && $otp === $demoOtp)) {
             if ($record) {
                 $upd = $db->prepare("UPDATE password_resets SET is_verified = 1 WHERE id = ?");
                 $upd->execute([$record['id']]);
-                $_SESSION['reset_identifier'] = $record['identifier'];
             }
             $_SESSION['otp_verified'] = true;
-            setFlash('success', 'OTP successfully verified. Please set your new password.');
+            setFlash('success', 'Identity successfully verified! Please create your new secure password.');
             header('Location: reset-password.php');
             exit;
         } else {
-            $error = 'Invalid or expired verification code. Please check and try again.';
+            $error = 'Invalid or expired verification code. Please check your email or click Resend Code below.';
         }
     }
 }
+
+$timeSinceLast = time() - ($_SESSION['reset_otp_time'] ?? 0);
+$cooldownLeft = max(0, 30 - $timeSinceLast);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -71,23 +122,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <div class="container otp-container">
         <a class="back-link otp-back-link" href="forgot-password.php"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Back to Forgot Password</a>
         <section class="recovery-card otp-card" aria-labelledby="otp-heading">
-          <div class="recovery-icon otp-icon"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span><i class="fa-solid fa-mobile-screen-button" aria-hidden="true"></i></span></div>
-          <h1 id="otp-heading">Enter Verification OTP</h1>
+          <div class="recovery-icon otp-icon"><i class="fa-solid fa-envelope-circle-check" aria-hidden="true"></i><span><i class="fa-solid fa-shield-halved" aria-hidden="true"></i></span></div>
+          <h1 id="otp-heading">Enter Verification Code</h1>
           <p class="recovery-description">
-            <?php if (!empty($identifier)): ?>
-              Sent to <strong><?php echo htmlspecialchars($identifier); ?></strong>
-            <?php else: ?>
-              Enter your 6-digit verification code below:
-            <?php endif; ?>
+            We sent a 6-digit verification code to<br />
+            <strong style="color: #0d6d43; font-size: 1.05rem; display: inline-block; margin-top: 4px;"><?php echo htmlspecialchars(maskEmail($identifier)); ?></strong>
           </p>
 
           <?php if ($flash): ?>
-            <div style="background: #def7ec; color: #03543f; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 0.9rem; border: 1px solid #bcf0da;">
+            <div style="background: <?php echo $flash['type'] === 'success' || $flash['type'] === 'info' ? '#def7ec' : '#fffbeb'; ?>; color: <?php echo $flash['type'] === 'success' || $flash['type'] === 'info' ? '#03543f' : '#92400e'; ?>; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 0.9rem; border: 1px solid <?php echo $flash['type'] === 'success' || $flash['type'] === 'info' ? '#bcf0da' : '#fef3c7'; ?>;">
               <i class="fa-solid fa-circle-check"></i> <?php echo $flash['message']; ?>
-            </div>
-          <?php elseif (!empty($demoOtp)): ?>
-            <div style="background: #def7ec; color: #03543f; padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 0.9rem; border: 1px solid #bcf0da;">
-              <i class="fa-solid fa-key"></i> Verification Code: <strong><?php echo htmlspecialchars($demoOtp); ?></strong>
             </div>
           <?php endif; ?>
 
@@ -98,31 +142,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <?php endif; ?>
 
           <form class="auth-form recovery-form otp-form" method="POST" action="verify-otp.php" data-auth-form="otp" novalidate>
-            <input type="hidden" name="otp" id="full-otp-input" value="<?php echo htmlspecialchars($demoOtp); ?>" />
+            <input type="hidden" name="otp" id="full-otp-input" value="" />
             <fieldset class="otp-fieldset">
-              <legend class="field-label">6-Digit Code</legend>
+              <legend class="field-label" style="text-align: center; margin-bottom: 8px;">Enter 6-Digit Code</legend>
               <div class="otp-inputs" aria-label="6-digit verification code">
-                <?php
-                $otpArray = str_split(str_pad($demoOtp, 6, ' '));
-                for ($i = 0; $i < 6; $i++):
-                  $val = trim($otpArray[$i] ?? '');
-                ?>
-                  <input class="otp-digit" aria-label="Digit <?php echo $i+1; ?>" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" value="<?php echo htmlspecialchars($val); ?>" required />
+                <?php for ($i = 0; $i < 6; $i++): ?>
+                  <input class="otp-digit" name="otp_digits[]" aria-label="Digit <?php echo $i+1; ?>" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" autocomplete="one-time-code" required />
                 <?php endfor; ?>
               </div>
             </fieldset>
-            <div class="resend-panel">
-              <span><i class="fa-regular fa-clock" aria-hidden="true"></i> Didn’t receive the code?</span>
-              <a href="forgot-password.php">Resend Code</a>
+
+            <div class="resend-panel" style="display: flex; justify-content: space-between; align-items: center; margin: 16px 0 24px;">
+              <span style="font-size: 0.88rem; color: #64748b;"><i class="fa-regular fa-clock" aria-hidden="true"></i> Code valid for 15 mins</span>
+              <a href="verify-otp.php?resend=1" id="resend-otp-btn" data-cooldown="<?php echo $cooldownLeft; ?>" style="color: #0d6d43; font-weight: 600; font-size: 0.9rem; text-decoration: none;">
+                <i class="fa-solid fa-rotate-right"></i> <span id="resend-text">Resend Code</span>
+              </a>
             </div>
+
             <button class="button button-green auth-submit" type="submit">Verify &amp; Proceed <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
             <p class="form-message" role="status" aria-live="polite"></p>
           </form>
-          <div class="recovery-bottom-links">
-            <a href="forgot-password.php"><i class="fa-solid fa-pen" aria-hidden="true"></i> Change Email / Mobile Number</a>
-            <a href="mailto:hello@foodbridge.org"><i class="fa-solid fa-phone" aria-hidden="true"></i> Need Help?</a>
+
+          <div class="recovery-bottom-links" style="margin-top: 20px; padding-top: 16px; border-top: 1px solid #eef2f0; display: flex; justify-content: space-between;">
+            <a href="forgot-password.php"><i class="fa-solid fa-pen" aria-hidden="true"></i> Change Email Address</a>
+            <a href="login.php"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i> Return to Login</a>
           </div>
         </section>
+
+        <!-- Developer helper box (for offline / localhost dev) -->
+        <?php if (!empty($demoOtp)): ?>
+        <div style="max-width: 440px; margin: 16px auto 0; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 10px 14px; font-size: 0.82rem; color: #475569; text-align: center;">
+          <i class="fa-solid fa-code"></i> <strong>Dev / Audit Code:</strong> <span style="font-family: monospace; font-weight: 700; color: #0d6d43; font-size: 0.95rem;"><?php echo htmlspecialchars($demoOtp); ?></span>
+          <br /><span style="font-size: 0.76rem; color: #64748b;">(Also logged to logs/mail_log.txt • Configure Gmail SMTP in config/mail.php for live inbox delivery)</span>
+        </div>
+        <?php endif; ?>
+
         <div style="text-align: center; margin-top: 24px; color: #71807d; font-size: 0.85rem;">
           <p>© <?php echo date('Y'); ?> Food Bridge. All rights reserved. • Developed with <i class="fa-solid fa-heart" style="color: #e25555;"></i> by <strong>Team EtherX</strong></p>
         </div>

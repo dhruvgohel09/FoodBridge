@@ -33,6 +33,7 @@ document.querySelectorAll('.password-toggle').forEach((toggle) => {
 // OTP Digit Input Auto-Advance & Combined Value
 const otpDigits = Array.from(document.querySelectorAll('.otp-digit'));
 const fullOtpInput = document.querySelector('#full-otp-input');
+const otpForm = document.querySelector('form[data-auth-form="otp"]');
 
 function updateFullOtp() {
   if (fullOtpInput) {
@@ -41,12 +42,25 @@ function updateFullOtp() {
 }
 
 if (otpDigits.length > 0) {
+  // Focus the first input automatically
+  otpDigits[0].focus();
+
   otpDigits.forEach((input, index) => {
     input.addEventListener('input', () => {
       input.value = input.value.replace(/\D/g, '').slice(-1);
       updateFullOtp();
       if (input.value && otpDigits[index + 1]) {
         otpDigits[index + 1].focus();
+      }
+      // If all 6 digits entered, auto-submit after a brief 200ms pause for smoother experience
+      const allFilled = otpDigits.every((d) => d.value.length === 1);
+      if (allFilled && otpForm) {
+        updateFullOtp();
+        setTimeout(() => {
+          if (otpForm.reportValidity()) {
+            otpForm.submit();
+          }
+        }, 250);
       }
     });
 
@@ -68,8 +82,39 @@ if (otpDigits.length > 0) {
       updateFullOtp();
       const nextIndex = Math.min(pastedCode.length, otpDigits.length - 1);
       otpDigits[nextIndex].focus();
+
+      if (pastedCode.length === 6 && otpForm) {
+        setTimeout(() => {
+          if (otpForm.reportValidity()) {
+            otpForm.submit();
+          }
+        }, 250);
+      }
     });
   });
+}
+
+// Resend OTP Cooldown Timer
+const resendBtn = document.querySelector('#resend-otp-btn');
+const resendText = document.querySelector('#resend-text');
+if (resendBtn && resendText) {
+  let cooldown = parseInt(resendBtn.getAttribute('data-cooldown') || '0', 10);
+  if (cooldown > 0) {
+    resendBtn.style.pointerEvents = 'none';
+    resendBtn.style.opacity = '0.6';
+    const interval = setInterval(() => {
+      cooldown--;
+      if (cooldown > 0) {
+        resendText.textContent = `Resend Code (${cooldown}s)`;
+      } else {
+        clearInterval(interval);
+        resendText.textContent = 'Resend Code';
+        resendBtn.style.pointerEvents = 'auto';
+        resendBtn.style.opacity = '1';
+      }
+    }, 1000);
+    resendText.textContent = `Resend Code (${cooldown}s)`;
+  }
 }
 
 // Client-side Form Validation Check Before Native PHP Submit
