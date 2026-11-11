@@ -55,7 +55,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         unset($_SESSION['otp_verified']);
         unset($_SESSION['reset_otp_time']);
 
-        setFlash('success', 'Your password has been successfully reset! You can now log in with your new credentials.');
+        // Prefill email on login page for user convenience
+        if ($userData) {
+            $_SESSION['registered_email'] = $userData['email'];
+        }
+
+        setFlash('success', 'Your password has been successfully reset! You can now log in with your new password.');
         header('Location: login.php');
         exit;
     }

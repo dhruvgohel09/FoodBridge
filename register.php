@@ -49,9 +49,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Send Welcome Email
                 sendWelcomeEmail($email, $name);
 
-                $_SESSION['user_id'] = $newUserId;
-                setFlash('success', 'Welcome to Food Bridge, ' . htmlspecialchars($name) . '! Your account is ready.');
-                header('Location: dashboard.php');
+                // Do not auto-login; redirect directly to login page as requested
+                $_SESSION['registered_email'] = $email;
+                setFlash('success', 'Account created successfully! A welcome email has been sent to ' . htmlspecialchars($email) . '. Please login with your credentials.');
+                header('Location: login.php');
                 exit;
             } catch (PDOException $e) {
                 $error = 'Registration failed: ' . $e->getMessage();

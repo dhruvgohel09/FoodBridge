@@ -7,6 +7,9 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Ensure consistent timezone across PHP and MySQL (Asia/Kolkata)
+date_default_timezone_set('Asia/Kolkata');
+
 // Database Credentials
 define('DB_HOST', '127.0.0.1');
 define('DB_PORT', '3306');
@@ -28,6 +31,7 @@ function getDB(): PDO {
         ];
         try {
             $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+            $pdo->exec("SET time_zone = '+05:30'");
         } catch (PDOException $e) {
             die("Database connection failed: " . htmlspecialchars($e->getMessage()));
         }

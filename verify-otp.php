@@ -32,13 +32,12 @@ if (isset($_GET['resend']) && $_GET['resend'] === '1') {
     } else {
         $db = getDB();
         $otp = str_pad((string)random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
-        $expiresAt = date('Y-m-d H:i:s', strtotime('+15 minutes'));
 
         // Invalidate old unverified codes
         $db->prepare("UPDATE password_resets SET is_verified = 2 WHERE identifier = ? AND is_verified = 0")->execute([$identifier]);
 
-        // Insert new code
-        $db->prepare("INSERT INTO password_resets (identifier, otp, is_verified, expires_at) VALUES (?, ?, 0, ?)")->execute([$identifier, $otp, $expiresAt]);
+        // Insert new code with 15-minute validity
+        $db->prepare("INSERT INTO password_resets (identifier, otp, is_verified, expires_at) VALUES (?, ?, 0, DATE_ADD(NOW(), INTERVAL 15 MINUTE))")->execute([$identifier, $otp]);
 
         $name = $_SESSION['reset_name'] ?? 'Community Member';
         $sent = sendOtpEmail($identifier, $name, $otp, 'Password Recovery');

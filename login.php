@@ -11,6 +11,9 @@ if (isLoggedIn()) {
 $error = '';
 $flash = getFlash();
 
+$prefilledEmail = $_SESSION['registered_email'] ?? ($_POST['email'] ?? '');
+unset($_SESSION['registered_email']);
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $rawEmail = sanitize($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
@@ -104,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               <?php if ($flash): ?>
                 <div style="background: <?php echo $flash['type'] === 'success' ? '#def7ec' : '#fde8e8'; ?>; color: <?php echo $flash['type'] === 'success' ? '#03543f' : '#9b1c1c'; ?>; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 0.9rem; border: 1px solid <?php echo $flash['type'] === 'success' ? '#bcf0da' : '#f8b4b4'; ?>;">
                   <i class="fa-solid <?php echo $flash['type'] === 'success' ? 'fa-circle-check' : 'fa-triangle-exclamation'; ?>"></i>
-                  <?php echo htmlspecialchars($flash['message']); ?>
+                  <?php echo $flash['message']; ?>
                 </div>
               <?php endif; ?>
 
@@ -118,12 +121,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <label class="field-label" for="login-email">Email Address</label>
                 <div class="input-wrap">
                   <i class="fa-regular fa-envelope" aria-hidden="true"></i>
-                  <input id="login-email" name="email" type="email" placeholder="Enter your email" autocomplete="email" value="<?php echo htmlspecialchars($_POST['email'] ?? 'dhruv.gohel@example.com'); ?>" required />
+                  <input id="login-email" name="email" type="email" placeholder="Enter your email" autocomplete="email" value="<?php echo htmlspecialchars($prefilledEmail ?: 'dhruv.gohel@example.com'); ?>" required />
                 </div>
                 <label class="field-label" for="login-password">Password</label>
                 <div class="input-wrap">
                   <i class="fa-solid fa-lock" aria-hidden="true"></i>
-                  <input id="login-password" name="password" type="password" placeholder="Enter your password" autocomplete="current-password" value="password123" required />
+                  <input id="login-password" name="password" type="password" placeholder="Enter your password" autocomplete="current-password" value="<?php echo empty($prefilledEmail) ? 'password123' : ''; ?>" required />
                   <button class="password-toggle" type="button" aria-label="Show password" aria-pressed="false"><i class="fa-regular fa-eye" aria-hidden="true"></i></button>
                 </div>
                 <div class="form-options">

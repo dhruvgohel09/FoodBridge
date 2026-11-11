@@ -41,14 +41,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($user) {
                 // Generate 6-digit secure numeric OTP
                 $otp = str_pad((string)random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
-                $expiresAt = date('Y-m-d H:i:s', strtotime('+15 minutes'));
-
                 // Invalidate any existing unused OTPs for this email
                 $db->prepare("UPDATE password_resets SET is_verified = 2 WHERE identifier = ? AND is_verified = 0")->execute([$user['email']]);
 
-                // Store new OTP
-                $ins = $db->prepare("INSERT INTO password_resets (identifier, otp, is_verified, expires_at) VALUES (?, ?, 0, ?)");
-                $ins->execute([$user['email'], $otp, $expiresAt]);
+                // Store new OTP with 15-minute validity
+                $ins = $db->prepare("INSERT INTO password_resets (identifier, otp, is_verified, expires_at) VALUES (?, ?, 0, DATE_ADD(NOW(), INTERVAL 15 MINUTE))");
+                $ins->execute([$user['email'], $otp]);
 
                 // Dispatch OTP email to user's registered email
                 $mailSent = sendOtpEmail($user['email'], $user['name'], $otp, 'Password Recovery');
