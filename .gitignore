@@ -1,0 +1,20 @@
+# Environment & Logs
+*.log
+.env
+.env.local
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.bak
+
+# User Uploads
+uploads/donations/*
+!uploads/donations/.gitkeep
+
