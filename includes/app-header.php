@@ -35,7 +35,7 @@ if (!empty($nameParts)) {
         <span class="app-header-brand-subtitle">Community Food Sharing</span>
       </span>
     </a>
-    <button class="menu-toggle" type="button" aria-label="Open navigation menu" aria-expanded="false" aria-controls="app-main-nav">
+    <button class="menu-toggle app-header-menu-toggle" type="button" aria-label="Open navigation menu" aria-expanded="false" aria-controls="app-main-nav">
       <span></span><span></span><span></span>
     </button>
     <nav class="app-header-nav" id="app-main-nav" aria-label="Main navigation">

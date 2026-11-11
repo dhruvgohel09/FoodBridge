@@ -49,6 +49,10 @@
   background: #f0f8f2;
   color: #08733d;
 }
+.app-header-menu-toggle,
+.menu-toggle {
+  display: none;
+}
 .app-header-nav {
   display: flex;
   flex: 1 1 auto;
@@ -177,7 +181,8 @@
   .app-header-inner {
     min-height: 60px;
   }
-  .app-header-menu-toggle {
+  .app-header-menu-toggle,
+  .menu-toggle {
     display: flex;
     flex: 0 0 34px;
     width: 34px;
@@ -191,15 +196,14 @@
     border-radius: 8px;
     background: #fff;
     cursor: pointer;
+    flex-direction: column;
   }
-  .app-header-menu-toggle span {
+  .app-header-menu-toggle span,
+  .menu-toggle span {
     width: 15px;
     height: 2px;
     border-radius: 2px;
     background: #303934;
-  }
-  .app-header-menu-toggle {
-    flex-direction: column;
   }
   .app-header-nav {
     position: absolute;

@@ -143,3 +143,4 @@ foodbridge/
 
 ## 👥 Authors
 Developed with ❤️ by **Team EtherX**
+
