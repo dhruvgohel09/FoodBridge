@@ -41,7 +41,7 @@
   color: #fff;
   background:
     linear-gradient(145deg, rgba(0, 101, 51, 0.95), rgba(0, 119, 59, 0.92)),
-    url("https://images.unsplash.com/photo-1593113598332-cd288d649433?auto=format&fit=crop&w=1000&q=80") center / cover;
+    url("../images/food-rescue.jpg") center / cover;
 }
 .auth-story::after {
   position: absolute;
@@ -406,7 +406,7 @@
   padding: 31px;
   background:
     linear-gradient(145deg, rgba(0, 111, 55, 0.94), rgba(0, 100, 49, 0.93)),
-    url("https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=1000&q=80") center / cover;
+    url("../images/wholesome-meals.jpg") center / cover;
 }
 .register-story-content {
   position: relative;
@@ -1071,4 +1071,108 @@
   .recovery-bottom-links {
     flex-direction: column;
   }
+}
+
+/* Inline Field Validation (Red border & message below) */
+.input-wrap.has-error,
+.input-wrap.has-error:focus,
+.input-wrap.has-error:focus-within,
+.register-form .input-wrap.has-error,
+.register-form .input-wrap.has-error:focus,
+.register-form .input-wrap.has-error:focus-within,
+.recovery-form .input-wrap.has-error,
+.recovery-form .input-wrap.has-error:focus,
+.recovery-form .input-wrap.has-error:focus-within,
+.form-field .input-wrap.has-error,
+.form-field .input-wrap.has-error:focus,
+.form-field .input-wrap.has-error:focus-within,
+.input-icon-wrap.has-error,
+.input-icon-wrap.has-error:focus,
+.input-icon-wrap.has-error:focus-within,
+.input-icon-wrap.has-error input,
+.form-control.has-error,
+input.has-error,
+select.has-error,
+textarea.has-error,
+.otp-inputs.has-error .otp-digit,
+.otp-inputs.has-error .otp-digit:focus {
+  border: 1.5px solid #dc2626 !important;
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.16) !important;
+  background-color: #fff !important;
+  outline: none !important;
+}
+
+.input-wrap.has-error input,
+.input-wrap.has-error select {
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.field-error-text {
+  display: block !important;
+  color: #dc2626 !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  margin-top: 6px !important;
+  margin-bottom: 6px !important;
+  line-height: 1.45 !important;
+  text-align: left !important;
+  animation: fieldFadeIn 0.15s ease-in-out;
+}
+
+/* Google Continue Button & Social Divider */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 16px 0 12px;
+  color: #788780;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #e5eae7;
+}
+.auth-divider span {
+  padding: 0 12px;
+}
+
+.google-auth-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 16px;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #3c4043;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.05);
+}
+.google-auth-btn:hover {
+  background: #f8faf9;
+  border-color: #c4c7cc;
+  box-shadow: 0 2px 6px rgba(60, 64, 67, 0.12);
+  color: #1a1a1a;
+}
+.google-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
 }

@@ -8,14 +8,14 @@ if (isLoggedIn()) {
     exit;
 }
 
-$error = '';
+$errors = [];
 $flash = getFlash();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $rawIdentifier = sanitize($_POST['identifier'] ?? '');
 
     if (empty($rawIdentifier)) {
-        $error = 'Please enter your registered email address or mobile number.';
+        $errors['identifier'] = 'Please enter your registered email address or mobile number.';
     } else {
         $isEmail = str_contains($rawIdentifier, '@');
         $identifier = $rawIdentifier;
@@ -24,13 +24,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($isEmail) {
             $validation = validateEmailAddress($rawIdentifier);
             if (!$validation['valid']) {
-                $error = $validation['error'];
+                $errors['identifier'] = 'The email address you entered is not valid. Please check your spelling and try again.';
             } else {
                 $identifier = $validation['email'];
             }
         }
 
-        if (empty($error)) {
+        if (empty($errors)) {
             $db = getDB();
             $stmt = $db->prepare("SELECT id, name, email, phone FROM users WHERE email = ? OR phone = ? OR phone LIKE ? LIMIT 1");
             $cleanPhone = preg_replace('/[^0-9]/', '', $identifier);
@@ -66,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header('Location: verify-otp.php');
                 exit;
             } else {
-                $error = 'No registered Food Bridge account found with that email or mobile number.';
+                $errors['identifier'] = 'No registered Food Bridge account found with that email or mobile number.';
             }
         }
     }
@@ -83,8 +83,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-    <link rel="stylesheet" href="css/style.css" />
-    <link rel="stylesheet" href="css/auth.css" />
+    <link rel="stylesheet" href="css/style.css?v=<?php echo filemtime(__DIR__ . '/css/style.css'); ?>" />
+    <link rel="stylesheet" href="css/auth.css?v=<?php echo filemtime(__DIR__ . '/css/auth.css'); ?>" />
   </head>
   <body class="auth-page recovery-page">
     <header class="header">
@@ -108,24 +108,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <h1 id="forgot-heading">Forgot Password?</h1>
           <p class="recovery-description">Enter your registered email address or mobile number to receive a 6-digit verification code directly to your email.</p>
 
-          <?php if (!empty($error)): ?>
-            <div style="background: #fde8e8; color: #9b1c1c; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 0.9rem; border: 1px solid #f8b4b4;">
-              <i class="fa-solid fa-triangle-exclamation"></i> <?php echo htmlspecialchars($error); ?>
-            </div>
-          <?php endif; ?>
-
           <?php if ($flash): ?>
             <div style="background: #def7ec; color: #03543f; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 0.9rem; border: 1px solid #bcf0da;">
               <i class="fa-solid fa-circle-info"></i> <?php echo $flash['message']; ?>
             </div>
           <?php endif; ?>
 
-          <form class="auth-form recovery-form" method="POST" action="forgot-password.php" novalidate>
+          <form class="auth-form recovery-form" method="POST" action="forgot-password.php" data-auth-form="forgot" novalidate>
             <label class="field-label" for="recovery-identifier">Registered Email or Mobile Number <span>*</span></label>
-            <div class="input-wrap">
+            <div class="input-wrap <?php echo isset($errors['identifier']) ? 'has-error' : ''; ?>" <?php if (isset($errors['identifier'])): ?>style="border: 1.5px solid #dc2626 !important; box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15) !important;"<?php endif; ?>>
               <i class="fa-solid fa-at" aria-hidden="true"></i>
               <input id="recovery-identifier" name="identifier" type="text" placeholder="e.g. name@gmail.com" value="<?php echo htmlspecialchars($_POST['identifier'] ?? ''); ?>" required />
             </div>
+            <?php if (!empty($errors['identifier'])): ?>
+              <span class="field-error-text" style="display:block; color:#dc2626 !important; font-size:12px !important; font-weight:600 !important; margin-top:5px !important; margin-bottom:5px !important; line-height:1.4 !important; text-align:left !important;"><?php echo $errors['identifier']; ?></span>
+            <?php endif; ?>
             <button class="button button-green auth-submit" type="submit">Send Verification Code <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
             <p class="form-message" role="status" aria-live="polite"></p>
           </form>
@@ -137,6 +134,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
       </div>
     </main>
-    <script src="js/auth.js" defer></script>
+    <script src="js/auth.js?v=<?php echo filemtime(__DIR__ . '/js/auth.js'); ?>" defer></script>
   </body>
 </html>

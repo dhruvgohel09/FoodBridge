@@ -440,3 +440,25 @@ body.admin-login-page {
     align-items: flex-start;
   }
 }
+
+/* Inline Field Validation (Red line & message below) */
+.input-wrap.has-error input,
+.input-wrap.has-error input:focus,
+input.has-error,
+input.has-error:focus {
+  border: 1.5px solid #dc2626 !important;
+  border-color: #dc2626 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.16) !important;
+  outline: none !important;
+}
+
+.field-error-text {
+  display: block !important;
+  color: #dc2626 !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  margin-top: 6px !important;
+  margin-bottom: 6px !important;
+  line-height: 1.45 !important;
+  text-align: left !important;
+}

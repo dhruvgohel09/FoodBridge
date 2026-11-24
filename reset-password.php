@@ -18,20 +18,26 @@ if (!$isVerified || empty($identifier)) {
     exit;
 }
 
-$error = '';
+$errors = [];
 $flash = getFlash();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'] ?? '';
     $confirm_password = $_POST['confirm_password'] ?? '';
 
-    if (empty($password) || empty($confirm_password)) {
-        $error = 'Please enter and confirm your new password.';
+    if (empty($password)) {
+        $errors['password'] = 'Password is required.';
     } elseif (strlen($password) < 6) {
-        $error = 'Password must be at least 6 characters long.';
+        $errors['password'] = 'Password must be at least 6 characters long.';
+    }
+
+    if (empty($confirm_password)) {
+        $errors['confirm_password'] = 'Please confirm your new password.';
     } elseif ($password !== $confirm_password) {
-        $error = 'Passwords do not match. Please re-enter.';
-    } else {
+        $errors['confirm_password'] = 'Passwords do not match. Please re-enter.';
+    }
+
+    if (empty($errors)) {
         $db = getDB();
         $hashed = password_hash($password, PASSWORD_DEFAULT);
 
@@ -77,8 +83,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-    <link rel="stylesheet" href="css/style.css" />
-    <link rel="stylesheet" href="css/auth.css" />
+    <link rel="stylesheet" href="css/style.css?v=<?php echo filemtime(__DIR__ . '/css/style.css'); ?>" />
+    <link rel="stylesheet" href="css/auth.css?v=<?php echo filemtime(__DIR__ . '/css/auth.css'); ?>" />
   </head>
   <body class="auth-page recovery-page">
     <header class="header">
@@ -108,25 +114,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
           <?php endif; ?>
 
-          <?php if (!empty($error)): ?>
-            <div style="background: #fde8e8; color: #9b1c1c; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 0.9rem; border: 1px solid #f8b4b4;">
-              <i class="fa-solid fa-triangle-exclamation"></i> <?php echo htmlspecialchars($error); ?>
-            </div>
-          <?php endif; ?>
-
           <form class="auth-form recovery-form reset-form" method="POST" action="reset-password.php" data-auth-form="reset" novalidate>
             <label class="field-label" for="new-password">New Password <span>*</span></label>
-            <div class="input-wrap">
+            <div class="input-wrap <?php echo isset($errors['password']) ? 'has-error' : ''; ?>" <?php if (isset($errors['password'])): ?>style="border: 1.5px solid #dc2626 !important; box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15) !important;"<?php endif; ?>>
               <i class="fa-solid fa-lock" aria-hidden="true"></i>
               <input id="new-password" name="password" type="password" placeholder="Enter at least 6 characters" autocomplete="new-password" minlength="6" required />
               <button class="password-toggle" type="button" aria-label="Show password" aria-pressed="false"><i class="fa-regular fa-eye" aria-hidden="true"></i></button>
             </div>
+            <?php if (!empty($errors['password'])): ?>
+              <span class="field-error-text" style="display:block; color:#dc2626 !important; font-size:12px !important; font-weight:600 !important; margin-top:5px !important; margin-bottom:5px !important; line-height:1.4 !important; text-align:left !important;"><?php echo $errors['password']; ?></span>
+            <?php endif; ?>
+
             <label class="field-label" for="confirm-new-password">Confirm New Password <span>*</span></label>
-            <div class="input-wrap">
+            <div class="input-wrap <?php echo isset($errors['confirm_password']) ? 'has-error' : ''; ?>" <?php if (isset($errors['confirm_password'])): ?>style="border: 1.5px solid #dc2626 !important; box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15) !important;"<?php endif; ?>>
               <i class="fa-solid fa-lock" aria-hidden="true"></i>
               <input id="confirm-new-password" name="confirm_password" type="password" placeholder="Re-enter your new password" autocomplete="new-password" minlength="6" required />
               <button class="password-toggle" type="button" aria-label="Show password" aria-pressed="false"><i class="fa-regular fa-eye" aria-hidden="true"></i></button>
             </div>
+            <?php if (!empty($errors['confirm_password'])): ?>
+              <span class="field-error-text" style="display:block; color:#dc2626 !important; font-size:12px !important; font-weight:600 !important; margin-top:5px !important; margin-bottom:5px !important; line-height:1.4 !important; text-align:left !important;"><?php echo $errors['confirm_password']; ?></span>
+            <?php endif; ?>
             <button class="button button-green auth-submit" type="submit">Update Password &amp; Log In <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
             <p class="form-message" role="status" aria-live="polite"></p>
           </form>
@@ -137,6 +144,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
       </div>
     </main>
-    <script src="js/auth.js" defer></script>
+    <script src="js/auth.js?v=<?php echo filemtime(__DIR__ . '/js/auth.js'); ?>" defer></script>
   </body>
 </html>

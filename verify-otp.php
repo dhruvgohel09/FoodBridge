@@ -100,8 +100,8 @@ $cooldownLeft = max(0, 30 - $timeSinceLast);
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-    <link rel="stylesheet" href="css/style.css" />
-    <link rel="stylesheet" href="css/auth.css" />
+    <link rel="stylesheet" href="css/style.css?v=<?php echo filemtime(__DIR__ . '/css/style.css'); ?>" />
+    <link rel="stylesheet" href="css/auth.css?v=<?php echo filemtime(__DIR__ . '/css/auth.css'); ?>" />
   </head>
   <body class="auth-page recovery-page">
     <header class="header">
@@ -134,21 +134,18 @@ $cooldownLeft = max(0, 30 - $timeSinceLast);
             </div>
           <?php endif; ?>
 
-          <?php if (!empty($error)): ?>
-            <div style="background: #fde8e8; color: #9b1c1c; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 0.9rem; border: 1px solid #f8b4b4;">
-              <i class="fa-solid fa-triangle-exclamation"></i> <?php echo htmlspecialchars($error); ?>
-            </div>
-          <?php endif; ?>
-
           <form class="auth-form recovery-form otp-form" method="POST" action="verify-otp.php" data-auth-form="otp" novalidate>
             <input type="hidden" name="otp" id="full-otp-input" value="" />
             <fieldset class="otp-fieldset">
               <legend class="field-label" style="text-align: center; margin-bottom: 8px;">Enter 6-Digit Code</legend>
-              <div class="otp-inputs" aria-label="6-digit verification code">
+              <div class="otp-inputs <?php echo !empty($error) ? 'has-error' : ''; ?>" aria-label="6-digit verification code">
                 <?php for ($i = 0; $i < 6; $i++): ?>
                   <input class="otp-digit" name="otp_digits[]" aria-label="Digit <?php echo $i+1; ?>" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" autocomplete="one-time-code" required />
                 <?php endfor; ?>
               </div>
+              <?php if (!empty($error)): ?>
+                <span class="field-error-text" style="display:block; color:#dc2626 !important; font-size:12px !important; font-weight:600 !important; margin-top:8px !important; margin-bottom:5px !important; line-height:1.4 !important; text-align:center !important;"><?php echo htmlspecialchars($error); ?></span>
+              <?php endif; ?>
             </fieldset>
 
             <div class="resend-panel" style="display: flex; justify-content: space-between; align-items: center; margin: 16px 0 24px;">
@@ -181,6 +178,6 @@ $cooldownLeft = max(0, 30 - $timeSinceLast);
         </div>
       </div>
     </main>
-    <script src="js/auth.js" defer></script>
+    <script src="js/auth.js?v=<?php echo filemtime(__DIR__ . '/js/auth.js'); ?>" defer></script>
   </body>
 </html>
