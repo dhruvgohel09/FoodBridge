@@ -223,7 +223,7 @@ class SimpleSMTPClient {
     private string $encryption;
     private string $username;
     private string $password;
-    private int $timeout = 12;
+    private int $timeout = 4;
 
     public function __construct(string $host, int $port, string $encryption = '', string $username = '', string $password = '') {
         $this->host = $host;
@@ -233,7 +233,7 @@ class SimpleSMTPClient {
         $this->password = $password;
     }
 
-    public function send(string $fromEmail, string $fromName, string $toEmail, string $toName, string $subject, string $htmlBody, string $textBody = ''): bool {
+    public function send(string $fromEmail, string $fromName, string $toEmail, string $toName, string $subject, string $htmlBody, string $textBody = '', string $replyTo = ''): bool {
         $socketHost = $this->host;
         if ($this->encryption === 'ssl') {
             $socketHost = 'ssl://' . $this->host;
@@ -304,8 +304,9 @@ class SimpleSMTPClient {
             }
         }
 
-        // Mail From
-        $this->writeCommand($socket, "MAIL FROM:<{$fromEmail}>");
+        // Mail From (Envelope sender for SMTP handshake)
+        $envelopeSender = !empty($this->username) ? $this->username : $fromEmail;
+        $this->writeCommand($socket, "MAIL FROM:<{$envelopeSender}>");
         $mailFromRes = $this->readResponse($socket);
         if (substr($mailFromRes, 0, 3) !== '250') {
             fclose($socket);
@@ -328,15 +329,16 @@ class SimpleSMTPClient {
             return false;
         }
 
+        $replyAddress = !empty($replyTo) ? $replyTo : $fromEmail;
         $boundary = '=_fb_' . md5(uniqid((string)time(), true));
         $headers = [
             "MIME-Version: 1.0",
             "From: =?UTF-8?B?" . base64_encode($fromName) . "?= <{$fromEmail}>",
-            "To: =?UTF-8?B?" . base64_encode($toName) . "?= <{$toEmail}>",
+            "Reply-To: =?UTF-8?B?" . base64_encode($fromName) . "?= <{$replyAddress}>",
             "Date: " . date('r'),
             "Subject: =?UTF-8?B?" . base64_encode($subject) . "?=",
             "Content-Type: multipart/alternative; boundary=\"{$boundary}\"",
-            "X-Mailer: FoodBridge PHP Mailer / Team EtherX"
+            "X-Mailer: FoodBridge Official Mail Engine"
         ];
 
         $plain = !empty($textBody) ? $textBody : strip_tags($htmlBody);
@@ -389,8 +391,9 @@ class SimpleSMTPClient {
 function sendFoodBridgeEmail(string $toEmail, string $toName, string $subject, string $htmlBody, string $textBody = ''): bool {
     $config = require __DIR__ . '/mail.php';
 
-    $fromEmail = $config['from_address'] ?? 'no-reply@foodbridge.org';
-    $fromName = $config['from_name'] ?? 'Food Bridge • Community Food Sharing';
+    $fromEmail = $config['from_address'] ?? 'team@foodbridge.org';
+    $fromName = $config['from_name'] ?? 'Food Bridge Official Team';
+    $replyTo = $config['reply_to'] ?? 'support@foodbridge.org';
     $sent = false;
     $method = 'unknown';
 
@@ -404,7 +407,7 @@ function sendFoodBridgeEmail(string $toEmail, string $toName, string $subject, s
                 $config['username'],
                 $config['password']
             );
-            $sent = $smtp->send($fromEmail, $fromName, $toEmail, $toName, $subject, $htmlBody, $textBody);
+            $sent = $smtp->send($fromEmail, $fromName, $toEmail, $toName, $subject, $htmlBody, $textBody, $replyTo);
             $method = 'smtp';
         } catch (\Throwable $e) {
             error_log("SMTP Error: " . $e->getMessage());
@@ -418,9 +421,9 @@ function sendFoodBridgeEmail(string $toEmail, string $toName, string $subject, s
         $headers = [
             "MIME-Version: 1.0",
             "From: {$fromName} <{$fromEmail}>",
-            "Reply-To: {$fromEmail}",
+            "Reply-To: {$replyTo}",
             "Content-Type: multipart/alternative; boundary=\"{$boundary}\"",
-            "X-Mailer: FoodBridge PHP Mailer / Team EtherX"
+            "X-Mailer: FoodBridge Official Mail Engine"
         ];
 
         $plain = !empty($textBody) ? $textBody : strip_tags($htmlBody);
@@ -673,6 +676,156 @@ HTML
 HTML;
 
     $text = "Hello {$toName},\n\nThe password for your Food Bridge account was successfully updated.\nIf you did not perform this action, please reach out to support immediately.\n\nFood Bridge • Developed by Team EtherX";
+
+    return sendFoodBridgeEmail($toEmail, $toName, $subject, $html, $text);
+}
+
+/**
+ * Send Donation Confirmation Email to Donor
+ */
+function sendDonationConfirmationEmail(string $toEmail, string $toName, string $donationCode, string $foodName, string $quantity, string $cityName, string $orgName, string $pickupAddress): bool {
+    $subject = "Donation Confirmed: {$donationCode} • Food Bridge";
+
+    $html = <<<HTML
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Donation Confirmed</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f6f4; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #222;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f6f4; padding: 30px 15px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width: 580px; background: #ffffff; border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.06); overflow: hidden; border: 1px solid #e5ebe7;">
+          <tr>
+            <td style="background: linear-gradient(135deg, #0d6d43 0%, #1f8c5a 100%); padding: 30px 32px; text-align: left;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 700;">🍲 Food Donation Logged</h1>
+              <p style="margin: 2px 0 0; color: #d8f3e5; font-size: 11px;">Reference: {$donationCode}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 34px 32px;">
+              <p style="margin: 0 0 12px; font-size: 15px; color: #1e2624;">Hello <strong>{$toName}</strong>,</p>
+              <p style="margin: 0 0 16px; font-size: 13px; line-height: 1.6; color: #55635e;">
+                Thank you for your generosity! Your food donation (<strong>{$donationCode}</strong>) has been successfully recorded in the Food Bridge network.
+              </p>
+
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="8" style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; margin: 18px 0; font-size: 13px;">
+                <tr>
+                  <td style="color: #6b7280; width: 35%;">Food Item:</td>
+                  <td style="font-weight: 600; color: #111827;">{$foodName}</td>
+                </tr>
+                <tr>
+                  <td style="color: #6b7280;">Quantity:</td>
+                  <td style="font-weight: 600; color: #111827;">{$quantity}</td>
+                </tr>
+                <tr>
+                  <td style="color: #6b7280;">Assigned Partner:</td>
+                  <td style="font-weight: 600; color: #0d6d43;">{$orgName} ({$cityName})</td>
+                </tr>
+                <tr>
+                  <td style="color: #6b7280;">Pickup Address:</td>
+                  <td style="font-weight: 600; color: #111827;">{$pickupAddress}</td>
+                </tr>
+              </table>
+
+              <p style="margin: 16px 0 0; font-size: 12px; color: #697772; line-height: 1.6;">
+                The volunteer distribution team from <strong>{$orgName}</strong> has been notified and will coordinate pickup shortly. You can track real-time status from your dashboard.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background: #fafbfa; border-top: 1px solid #edf0ee; padding: 20px 32px; text-align: center;">
+              <p style="margin: 0; font-size: 11px; color: #889490;">
+                © 2026 Food Bridge. All rights reserved. • Developed with ❤️ by <strong>Team EtherX</strong>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+HTML;
+
+    $text = "Hello {$toName},\n\nYour donation ({$donationCode}) of {$foodName} ({$quantity}) has been registered!\nAssigned Partner: {$orgName} ({$cityName})\nPickup Address: {$pickupAddress}\n\nThank you for supporting community food sharing.\nFood Bridge • Developed by Team EtherX";
+
+    return sendFoodBridgeEmail($toEmail, $toName, $subject, $html, $text);
+}
+
+/**
+ * Send Food Request Confirmation Email to Recipient
+ */
+function sendFoodRequestConfirmationEmail(string $toEmail, string $toName, string $requestCode, string $foodType, int $peopleCount, string $cityName): bool {
+    $subject = "Food Request Received: {$requestCode} • Food Bridge";
+
+    $html = <<<HTML
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Food Request Received</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f6f4; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #222;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f4f6f4; padding: 30px 15px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width: 580px; background: #ffffff; border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.06); overflow: hidden; border: 1px solid #e5ebe7;">
+          <tr>
+            <td style="background: linear-gradient(135deg, #0d6d43 0%, #1f8c5a 100%); padding: 30px 32px; text-align: left;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 20px; font-weight: 700;">🌱 Food Request Received</h1>
+              <p style="margin: 2px 0 0; color: #d8f3e5; font-size: 11px;">Request ID: {$requestCode}</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 34px 32px;">
+              <p style="margin: 0 0 12px; font-size: 15px; color: #1e2624;">Hello <strong>{$toName}</strong>,</p>
+              <p style="margin: 0 0 16px; font-size: 13px; line-height: 1.6; color: #55635e;">
+                We have received your food request (<strong>{$requestCode}</strong>). Local verified community kitchens and NGOs in <strong>{$cityName}</strong> are reviewing matching surplus food.
+              </p>
+
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="8" style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; margin: 18px 0; font-size: 13px;">
+                <tr>
+                  <td style="color: #6b7280; width: 35%;">Requested Type:</td>
+                  <td style="font-weight: 600; color: #111827;">{$foodType}</td>
+                </tr>
+                <tr>
+                  <td style="color: #6b7280;">Number of People:</td>
+                  <td style="font-weight: 600; color: #111827;">{$peopleCount} People</td>
+                </tr>
+                <tr>
+                  <td style="color: #6b7280;">City:</td>
+                  <td style="font-weight: 600; color: #0d6d43;">{$cityName}</td>
+                </tr>
+                <tr>
+                  <td style="color: #6b7280;">Status:</td>
+                  <td style="font-weight: 600; color: #92400e;">Pending Community Allocation</td>
+                </tr>
+              </table>
+
+              <p style="margin: 16px 0 0; font-size: 12px; color: #697772; line-height: 1.6;">
+                100% Free Service • Dignified and respectful community distribution. You will be contacted once allocation is confirmed.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background: #fafbfa; border-top: 1px solid #edf0ee; padding: 20px 32px; text-align: center;">
+              <p style="margin: 0; font-size: 11px; color: #889490;">
+                © 2026 Food Bridge. All rights reserved. • Developed with ❤️ by <strong>Team EtherX</strong>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+HTML;
+
+    $text = "Hello {$toName},\n\nYour food request ({$requestCode}) for {$foodType} ({$peopleCount} people) in {$cityName} has been received.\n\nCommunity hubs are reviewing surplus food allocation.\nFood Bridge • Developed by Team EtherX";
 
     return sendFoodBridgeEmail($toEmail, $toName, $subject, $html, $text);
 }

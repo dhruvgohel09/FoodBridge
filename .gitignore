@@ -20,3 +20,6 @@ Desktop.ini
 uploads/donations/*
 !uploads/donations/.gitkeep
 
+
+scratch/
+
