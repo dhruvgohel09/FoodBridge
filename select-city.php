@@ -109,7 +109,7 @@ if (!$selectedCity && !empty($cities)) {
     <aside class="sidebar">
       <div class="logistics-card">
         <div class="logistics-header">
-          <img src="https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=900&q=80" alt="Fresh community meals ready for distribution">
+          <img src="images/wholesome-meals.jpg" alt="Fresh community meals ready for distribution">
           <span class="logistics-tag"><i class="fa-solid fa-truck-fast"></i> Community Logistics</span>
         </div>
         <p>Every city has registered non-profit hubs ready to rescue surplus dining portions and transport them to nearby shelters.</p>

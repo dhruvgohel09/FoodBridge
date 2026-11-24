@@ -15,7 +15,8 @@ CREATE TABLE IF NOT EXISTS `users` (
   `role` ENUM('user', 'admin') DEFAULT 'user',
   `status` ENUM('Active', 'Inactive', 'Blocked') DEFAULT 'Active',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_users_phone` (`phone`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 2. Admins Table
@@ -37,7 +38,9 @@ CREATE TABLE IF NOT EXISTS `password_resets` (
   `otp` VARCHAR(10) NOT NULL,
   `is_verified` TINYINT(1) DEFAULT 0,
   `expires_at` DATETIME NOT NULL,
-  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_pr_ident_otp` (`identifier`, `otp`, `is_verified`),
+  INDEX `idx_pr_expires` (`expires_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 4. Cities Table
@@ -67,6 +70,7 @@ CREATE TABLE IF NOT EXISTS `organizations` (
   `description` TEXT,
   `is_active` TINYINT(1) DEFAULT 1,
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_org_active` (`is_active`),
   FOREIGN KEY (`city_id`) REFERENCES `cities`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -91,6 +95,8 @@ CREATE TABLE IF NOT EXISTS `donations` (
   `status` ENUM('Pending', 'Accepted', 'Completed', 'Cancelled') DEFAULT 'Pending',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_don_status` (`status`),
+  INDEX `idx_don_created` (`created_at`),
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
   FOREIGN KEY (`city_id`) REFERENCES `cities`(`id`) ON DELETE RESTRICT,
   FOREIGN KEY (`organization_id`) REFERENCES `organizations`(`id`) ON DELETE RESTRICT
@@ -112,29 +118,31 @@ CREATE TABLE IF NOT EXISTS `food_requests` (
   `status` ENUM('Pending', 'Accepted', 'Completed', 'Cancelled') DEFAULT 'Pending',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX `idx_fr_status` (`status`),
+  INDEX `idx_fr_org` (`assigned_org_id`),
+  INDEX `idx_fr_created` (`created_at`),
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 8. Seed Data
 
--- Default password hash for 'admin123':
--- $2y$10$vY3V0zFekxYlVv9bZk6UheG615kO2mI8aY1iG09P5K5mQxG1Y0k2.
--- Default password hash for 'password123':
--- $2y$10$rN2g7l5o5s1d9k2a7b8c6eH1u2v3w4x5y6z7a8b9c0d1e2f3g4h5i
+-- Valid bcrypt hashes:
+-- 'admin123'    -> $2y$10$xoASZdgSM4agLgQGcxT8tekLsv.qbAFTlfE0gJKr.rpvnkSp8FJWG
+-- 'password123' -> $2y$10$FnhdLO9lDbffC3cNUC6fRunz.Tj4x40JoFSCNVfTxVh4z.VkieefO
 
 INSERT INTO `admins` (`id`, `name`, `email`, `password`, `role`, `status`) VALUES
-(1, 'System Admin', 'ops.head@foodbridge.org', '$2y$10$eE61v4o1J9p3o0Qh1c3B7uA5JbXbA4S9b7.x3d1V6r7U8w9X0y1Za', 'Super Admin / Ops Head', 'Active'),
-(2, 'Operations Admin', 'admin@foodbridge.org', '$2y$10$eE61v4o1J9p3o0Qh1c3B7uA5JbXbA4S9b7.x3d1V6r7U8w9X0y1Za', 'System Administrator', 'Active')
+(1, 'System Admin', 'ops.head@foodbridge.org', '$2y$10$xoASZdgSM4agLgQGcxT8tekLsv.qbAFTlfE0gJKr.rpvnkSp8FJWG', 'Super Admin / Ops Head', 'Active'),
+(2, 'Operations Admin', 'admin@foodbridge.org', '$2y$10$xoASZdgSM4agLgQGcxT8tekLsv.qbAFTlfE0gJKr.rpvnkSp8FJWG', 'System Administrator', 'Active')
 ON DUPLICATE KEY UPDATE `email` = VALUES(`email`);
 
 INSERT INTO `users` (`id`, `name`, `email`, `phone`, `password`, `city`, `role`, `status`) VALUES
-(1, 'Dhruv Gohel', 'dhruv.gohel@example.com', '+91 98765 43210', '$2y$10$wU0f9o9m9n8b7v6c5x4z3.k1j2h3g4f5d6s7a8p9o0i9u8y7t6r5e', 'Rajkot', 'user', 'Active'),
-(2, 'Rahul Sharma', 'rahul.sharma@example.com', '+91 98250 12345', '$2y$10$wU0f9o9m9n8b7v6c5x4z3.k1j2h3g4f5d6s7a8p9o0i9u8y7t6r5e', 'Rajkot', 'user', 'Active'),
-(3, 'Priya Mehta', 'priya.mehta@example.com', '+91 98795 67890', '$2y$10$wU0f9o9m9n8b7v6c5x4z3.k1j2h3g4f5d6s7a8p9o0i9u8y7t6r5e', 'Ahmedabad', 'user', 'Active'),
-(4, 'Amit Patel', 'amit.patel@example.com', '+91 94260 54321', '$2y$10$wU0f9o9m9n8b7v6c5x4z3.k1j2h3g4f5d6s7a8p9o0i9u8y7t6r5e', 'Surat', 'user', 'Active'),
-(5, 'Neha Joshi', 'neha.j@example.com', '+91 99099 11223', '$2y$10$wU0f9o9m9n8b7v6c5x4z3.k1j2h3g4f5d6s7a8p9o0i9u8y7t6r5e', 'Vadodara', 'user', 'Active'),
-(6, 'Vikram Singh', 'vikram.s@example.com', '+91 98241 99887', '$2y$10$wU0f9o9m9n8b7v6c5x4z3.k1j2h3g4f5d6s7a8p9o0i9u8y7t6r5e', 'Bhavnagar', 'user', 'Active'),
-(7, 'Anjali Dave', 'anjali.dave@example.com', '+91 97230 44556', '$2y$10$wU0f9o9m9n8b7v6c5x4z3.k1j2h3g4f5d6s7a8p9o0i9u8y7t6r5e', 'Junagadh', 'user', 'Active')
+(1, 'Dhruv Gohel', 'dhruv.gohel@example.com', '+91 98765 43210', '$2y$10$FnhdLO9lDbffC3cNUC6fRunz.Tj4x40JoFSCNVfTxVh4z.VkieefO', 'Rajkot', 'user', 'Active'),
+(2, 'Rahul Sharma', 'rahul.sharma@example.com', '+91 98250 12345', '$2y$10$FnhdLO9lDbffC3cNUC6fRunz.Tj4x40JoFSCNVfTxVh4z.VkieefO', 'Rajkot', 'user', 'Active'),
+(3, 'Priya Mehta', 'priya.mehta@example.com', '+91 98795 67890', '$2y$10$FnhdLO9lDbffC3cNUC6fRunz.Tj4x40JoFSCNVfTxVh4z.VkieefO', 'Ahmedabad', 'user', 'Active'),
+(4, 'Amit Patel', 'amit.patel@example.com', '+91 94260 54321', '$2y$10$FnhdLO9lDbffC3cNUC6fRunz.Tj4x40JoFSCNVfTxVh4z.VkieefO', 'Surat', 'user', 'Active'),
+(5, 'Neha Joshi', 'neha.j@example.com', '+91 99099 11223', '$2y$10$FnhdLO9lDbffC3cNUC6fRunz.Tj4x40JoFSCNVfTxVh4z.VkieefO', 'Vadodara', 'user', 'Active'),
+(6, 'Vikram Singh', 'vikram.s@example.com', '+91 98241 99887', '$2y$10$FnhdLO9lDbffC3cNUC6fRunz.Tj4x40JoFSCNVfTxVh4z.VkieefO', 'Bhavnagar', 'user', 'Active'),
+(7, 'Anjali Dave', 'anjali.dave@example.com', '+91 97230 44556', '$2y$10$FnhdLO9lDbffC3cNUC6fRunz.Tj4x40JoFSCNVfTxVh4z.VkieefO', 'Junagadh', 'user', 'Active')
 ON DUPLICATE KEY UPDATE `email` = VALUES(`email`);
 
 INSERT INTO `cities` (`id`, `name`, `status_label`, `centers_count`, `description`, `eta_info`, `is_active`) VALUES
@@ -157,8 +165,8 @@ INSERT INTO `organizations` (`id`, `city_id`, `name`, `short_code`, `category`, 
 ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
 
 INSERT INTO `donations` (`id`, `donation_code`, `user_id`, `food_name`, `food_type`, `quantity`, `unit`, `serves`, `available_date`, `available_time`, `food_photo`, `notes`, `city_id`, `organization_id`, `pickup_address`, `contact_phone`, `status`, `created_at`) VALUES
-(1, 'FB-2026-001', 1, 'Rice and Vegetable Curry', 'Cooked Food', 10.00, 'Kg', 25, '2026-09-24', '11:30', 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=900&q=80', 'Freshly prepared food. Suitable for children and adults. Packed in food-grade foil containers.', 1, 1, '12 Patel Colony, Kalawad Road, Rajkot', '+91 98765 43210', 'Pending', '2026-09-24 11:30:00'),
-(2, 'FB-2026-002', 1, 'Packed Gujarati Thalis & Khichdi', 'Prepared Meals', 50.00, 'Meals', 50, '2026-09-20', '13:00', 'https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&w=900&q=85', 'Packed lunch boxes left from a family event. Kept clean and warm.', 1, 2, '5 Shivam Apartment, Yagnik Road, Rajkot', '+91 98765 43210', 'Accepted', '2026-09-20 13:00:00'),
+(1, 'FB-2026-001', 1, 'Rice and Vegetable Curry', 'Cooked Food', 10.00, 'Kg', 25, '2026-09-24', '11:30', 'images/wholesome-meals.jpg', 'Freshly prepared food. Suitable for children and adults. Packed in food-grade foil containers.', 1, 1, '12 Patel Colony, Kalawad Road, Rajkot', '+91 98765 43210', 'Pending', '2026-09-24 11:30:00'),
+(2, 'FB-2026-002', 1, 'Packed Gujarati Thalis & Khichdi', 'Prepared Meals', 50.00, 'Meals', 50, '2026-09-20', '13:00', 'images/packed-thali.jpg', 'Packed lunch boxes left from a family event. Kept clean and warm.', 1, 2, '5 Shivam Apartment, Yagnik Road, Rajkot', '+91 98765 43210', 'Accepted', '2026-09-20 13:00:00'),
 (3, 'FB-2026-003', 1, 'Fresh Seasonal Fruits (Bananas & Apples)', 'Fresh Produce', 30.00, 'Kg', 60, '2026-09-18', '10:00', NULL, 'Clean wholesale surplus fruit boxes.', 1, 3, 'Market Yard Gate 2, Rajkot', '+91 98765 43210', 'Completed', '2026-09-18 10:00:00'),
 (4, 'FB-2026-004', 1, 'Dry Ration Kits (Wheat & Rice)', 'Dry Ration', 40.00, 'Kg', 80, '2026-09-12', '16:30', NULL, 'Standard 10kg sealed grain bags.', 1, 1, 'Near University Road, Rajkot', '+91 98765 43210', 'Completed', '2026-09-12 16:30:00')
 ON DUPLICATE KEY UPDATE `donation_code` = VALUES(`donation_code`);

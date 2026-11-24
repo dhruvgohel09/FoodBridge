@@ -12,17 +12,17 @@ $flash = getFlash();
 // User Statistics from MySQL
 $statStmt = $db->prepare("SELECT
     COUNT(*) as total_donations,
-    SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END) as completed_donations,
-    SUM(CASE WHEN status = 'Pending' THEN 1 ELSE 0 END) as pending_donations,
-    SUM(serves) as total_servings
+    COALESCE(SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END), 0) as completed_donations,
+    COALESCE(SUM(CASE WHEN status = 'Pending' THEN 1 ELSE 0 END), 0) as pending_donations,
+    COALESCE(SUM(serves), 0) as total_servings
     FROM donations WHERE user_id = ?");
 $statStmt->execute([$user['id']]);
 $userDonationStats = $statStmt->fetch() ?: ['total_donations' => 0, 'completed_donations' => 0, 'pending_donations' => 0, 'total_servings' => 0];
 
 $reqStatStmt = $db->prepare("SELECT
     COUNT(*) as total_requests,
-    SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END) as completed_requests,
-    SUM(CASE WHEN status = 'Pending' THEN 1 ELSE 0 END) as pending_requests
+    COALESCE(SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END), 0) as completed_requests,
+    COALESCE(SUM(CASE WHEN status = 'Pending' THEN 1 ELSE 0 END), 0) as pending_requests
     FROM food_requests WHERE user_id = ?");
 $reqStatStmt->execute([$user['id']]);
 $userReqStats = $reqStatStmt->fetch() ?: ['total_requests' => 0, 'completed_requests' => 0, 'pending_requests' => 0];
@@ -436,7 +436,7 @@ $recentRequests = $recentRequestsStmt->fetchAll();
         </div>
         <div class="welcome-visual">
           <div class="welcome-photo">
-            <img src="https://images.unsplash.com/photo-1593113598332-cd288d649433?auto=format&fit=crop&w=1200&q=80" alt="Community food rescue and distribution" />
+            <img src="images/food-rescue.jpg" alt="Community food rescue and distribution" />
           </div>
           <div class="visual-card">
             <div class="mini-icon"><i class="fa-solid fa-people-group"></i></div>

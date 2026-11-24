@@ -120,7 +120,7 @@ if (!$selectedOrg && !empty($organizations)) {
     <aside class="sidebar">
       <div class="story-card">
         <div class="story-photo">
-          <img src="https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=900&q=80" alt="Community volunteers preparing food for distribution">
+          <img src="images/wholesome-meals.jpg" alt="Community volunteers preparing food for distribution">
           <span class="story-tag"><i class="fa-solid fa-truck-fast"></i> Community Logistics</span>
         </div>
         <p>Food Bridge relays your donation to community kitchens and relief partners who operate across <?php echo htmlspecialchars($city['name']); ?> to distribute fresh meals quickly.</p>
@@ -179,17 +179,17 @@ if (!$selectedOrg && !empty($organizations)) {
         <div class="organization-list">
           <?php
           $orgImages = [
-              1 => 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=900&q=80', // Hot cooked meals
-              2 => 'https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&w=900&q=85', // Packed thalis
-              3 => 'https://images.unsplash.com/photo-1509315811345-672d83ef2fbc?auto=format&fit=crop&w=900&q=80', // Fresh bread and grains
-              4 => 'https://images.unsplash.com/photo-1593113598332-cd288d649433?auto=format&fit=crop&w=900&q=80', // Food rescue boxes
-              5 => 'https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&w=900&q=80', // Community dining
-              6 => 'https://images.unsplash.com/photo-1610348725531-843dff563e2c?auto=format&fit=crop&w=900&q=80', // Fresh produce & fruits
+              1 => 'images/wholesome-meals.jpg', // Hot cooked meals
+              2 => 'images/packed-thali.jpg', // Packed thalis
+              3 => 'images/bread-grains.jpg', // Fresh bread and grains
+              4 => 'images/food-rescue.jpg', // Food rescue boxes
+              5 => 'images/community-dining.jpg', // Community dining
+              6 => 'images/fresh-produce.jpg', // Fresh produce & fruits
           ];
           foreach ($organizations as $org):
             $isSelected = ($org['id'] == $selectedOrgId);
             $itemsArray = explode(',', $org['accepted_items'] ?? 'Cooked Food, Packaged Food');
-            $imgUrl = $orgImages[$org['id']] ?? 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=900&q=80';
+            $imgUrl = $orgImages[$org['id']] ?? 'images/wholesome-meals.jpg';
           ?>
             <article class="organization-card <?php echo $isSelected ? 'selected' : ''; ?>" onclick="selectOrg(<?php echo $org['id']; ?>, '<?php echo addslashes($org['name']); ?>')">
               <div class="org-image">

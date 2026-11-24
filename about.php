@@ -100,7 +100,7 @@ $user = currentUser();
       <div class="about-pills"><span><i class="fa-solid fa-leaf"></i> Zero Food Waste Goal</span><span><i class="fa-solid fa-earth-asia"></i> 100% Non-Profit Model</span><span><i class="fa-solid fa-hand-holding-heart"></i> Direct &amp; Dignified Support</span></div>
     </section>
     <section class="container about-photo" aria-label="Community meal sharing">
-      <img src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&w=1600&q=85" alt="Volunteers and community members sharing freshly prepared food">
+      <img src="images/community-dining.jpg" alt="Volunteers and community members sharing freshly prepared food">
       <span class="rescued-pill"><i class="fa-solid fa-circle"></i> 148,200+ kg Rescued <small>This Fiscal Year</small></span>
       <blockquote class="about-quote"><strong><i class="fa-solid fa-quote-left" style="color:#08733d"></i> “No edible food discarded while a single neighbor goes hungry.”</strong><small>Food Bridge Community Guiding Pledge • Serving 42 Local Wards</small></blockquote>
     </section>

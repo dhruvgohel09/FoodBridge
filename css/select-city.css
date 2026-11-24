@@ -103,7 +103,7 @@
   overflow: hidden;
   background:
     linear-gradient(0deg, rgba(24, 31, 26, 0.55), transparent 65%),
-    url("https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=900&q=80") center / cover,
+    url("../images/wholesome-meals.jpg") center / cover,
     #e8eee8;
 }
 .select-city-page .logistics-header img {

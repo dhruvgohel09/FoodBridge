@@ -64,7 +64,7 @@ $user = null;
           </div>
         </div>
         <div class="hero-image">
-          <img src="https://images.unsplash.com/photo-1593113598332-cd288d649433?auto=format&amp;fit=crop&amp;w=1200&amp;q=85" alt="Volunteers packing fresh food donations for the community">
+          <img src="images/food-rescue.jpg" alt="Volunteers packing fresh food donations for the community">
           <div class="hero-badge">
             <div class="badge-icon"><i class="fa-solid fa-bowl-food"></i></div>
             <div class="badge-text"><h4>Community Powered</h4><p>Fresh &amp; Dignified Meals</p></div>
@@ -105,7 +105,7 @@ $user = null;
     <section class="about section-space" id="about">
       <div class="container about-inner">
         <div class="about-image">
-          <img src="https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&amp;fit=crop&amp;w=1100&amp;q=85" alt="Fresh wholesome food prepared for community distribution" loading="lazy">
+          <img src="images/wholesome-meals.jpg" alt="Fresh wholesome food prepared for community distribution" loading="lazy">
         </div>
         <div class="about-content">
           <span class="section-label"><i class="fa-solid fa-circle"></i> PLATFORM OVERVIEW</span>
