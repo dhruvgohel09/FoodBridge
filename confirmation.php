@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/config/auth.php';
+require_once __DIR__ . '/config/mailer.php';
 
 requireLogin();
 
@@ -36,15 +37,24 @@ $organization = $orgStmt->fetch() ?: [
     'description' => 'Community organization working to connect surplus food with people in need across Rajkot neighborhoods.'
 ];
 
-$error = '';
+$errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $pickup_address = sanitize($_POST['pickup_address'] ?? '');
     $contact_phone = sanitize($_POST['contact_phone'] ?? ($user['phone'] ?? ''));
 
     if (empty($pickup_address)) {
-        $error = 'Please enter your pickup address.';
-    } else {
+        $errors['pickup_address'] = 'Please enter your pickup address.';
+    }
+
+    $cleanPhone = preg_replace('/[^0-9]/', '', $contact_phone);
+    if (empty($contact_phone)) {
+        $errors['contact_phone'] = 'Contact phone number is required.';
+    } elseif (strlen($cleanPhone) < 10) {
+        $errors['contact_phone'] = 'Please enter a valid 10-digit contact phone number.';
+    }
+
+    if (empty($errors)) {
         // Generate donation code
         $countStmt = $db->query("SELECT COUNT(*) FROM donations");
         $nextNum = intval($countStmt->fetchColumn()) + 1;
@@ -72,6 +82,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
 
             unset($_SESSION['donation_draft']);
+
+            // Send donation confirmation email to user
+            if (!empty($user['email'])) {
+                sendDonationConfirmationEmail(
+                    $user['email'],
+                    $user['name'],
+                    $donationCode,
+                    $draft['food_name'],
+                    $draft['quantity'] . ' ' . $draft['unit'],
+                    $city['name'],
+                    $organization['name'],
+                    $pickup_address
+                );
+            }
+
             setFlash('success', "Your donation ({$donationCode}) has been successfully logged! {$organization['name']} has been alerted.");
             header('Location: donation-details.php?code=' . urlencode($donationCode));
             exit;
@@ -87,9 +112,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Confirm Your Donation - Food Bridge</title>
-  <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="css/confirmation.css">
-  <link rel="stylesheet" href="css/app-header.css">
+  <link rel="stylesheet" href="css/style.css?v=<?php echo filemtime(__DIR__ . '/css/style.css'); ?>">
+  <link rel="stylesheet" href="css/confirmation.css?v=<?php echo filemtime(__DIR__ . '/css/confirmation.css'); ?>">
+  <link rel="stylesheet" href="css/app-header.css?v=<?php echo filemtime(__DIR__ . '/css/app-header.css'); ?>">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
@@ -137,19 +162,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
   </div>
 
-  <form method="POST" action="confirmation.php">
+  <form method="POST" action="confirmation.php" novalidate>
     <div class="container confirmation-layout">
       <main class="confirmation-main">
         <div class="confirm-header">
           <h1>Confirm Your Donation</h1>
           <p>Please review your donation details before submitting to ensure seamless local dispatch to <?php echo htmlspecialchars($organization['name']); ?>.</p>
         </div>
-
-        <?php if (!empty($error)): ?>
-          <div style="background: #fde8e8; color: #9b1c1c; padding: 14px 18px; border-radius: 12px; margin-bottom: 20px; font-size: 0.95rem; border: 1px solid #f8b4b4;">
-            <i class="fa-solid fa-triangle-exclamation"></i> <?php echo htmlspecialchars($error); ?>
-          </div>
-        <?php endif; ?>
 
         <section class="food-details-card">
           <div class="food-card-header">
@@ -223,13 +242,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="section-label" style="font-weight: 700; color: #1e2624; margin-bottom: 8px;">
               <i class="fa-solid fa-map-location-dot" style="color: #1f8c5a;"></i> Pickup Address <b>*</b>
             </div>
-            <input type="text" name="pickup_address" value="12 Patel Colony, Kalawad Road, <?php echo htmlspecialchars($city['name']); ?>" placeholder="Enter exact street / building / landmark address for volunteer pickup" style="width: 100%; padding: 12px 14px; border: 1px solid #c7d6cf; border-radius: 8px; font-size: 0.95rem;" required>
+            <input class="<?php echo isset($errors['pickup_address']) ? 'has-error' : ''; ?>" type="text" name="pickup_address" value="<?php echo htmlspecialchars($_POST['pickup_address'] ?? '12 Patel Colony, Kalawad Road, ' . $city['name']); ?>" placeholder="Enter exact street / building / landmark address for volunteer pickup" style="width: 100%; padding: 12px 14px; border: 1px solid #c7d6cf; border-radius: 8px; font-size: 0.95rem;" required>
+            <?php if (!empty($errors['pickup_address'])): ?>
+              <span class="field-error-text"><?php echo htmlspecialchars($errors['pickup_address']); ?></span>
+            <?php endif; ?>
 
             <div style="margin-top: 12px;">
               <div class="section-label" style="font-weight: 700; color: #1e2624; margin-bottom: 6px;">
                 <i class="fa-solid fa-phone" style="color: #1f8c5a;"></i> Contact Phone Number
               </div>
-              <input type="text" name="contact_phone" value="<?php echo htmlspecialchars($user['phone'] ?? '+91 98765 43210'); ?>" placeholder="Mobile number for pickup coordination" style="width: 100%; padding: 12px 14px; border: 1px solid #c7d6cf; border-radius: 8px; font-size: 0.95rem;" required>
+              <input class="<?php echo isset($errors['contact_phone']) ? 'has-error' : ''; ?>" type="text" name="contact_phone" value="<?php echo htmlspecialchars($_POST['contact_phone'] ?? ($user['phone'] ?? '+91 98765 43210')); ?>" placeholder="Mobile number for pickup coordination" style="width: 100%; padding: 12px 14px; border: 1px solid #c7d6cf; border-radius: 8px; font-size: 0.95rem;" required>
+              <?php if (!empty($errors['contact_phone'])): ?>
+                <span class="field-error-text"><?php echo htmlspecialchars($errors['contact_phone']); ?></span>
+              <?php endif; ?>
             </div>
           </div>
 
@@ -275,7 +300,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           </div>
 
           <div class="support-banner">
-            <img src="https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=900&q=80" alt="Volunteers supporting food distribution">
+            <img src="images/wholesome-meals.jpg" alt="Volunteers supporting food distribution">
             <div class="support-caption">
               <strong>Your surplus food donation</strong>
               <p>helps provide nutritious meals to families across <?php echo htmlspecialchars($city['name']); ?> with dignity and care.</p>
@@ -330,6 +355,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <p>Community Food Sharing across Gujarat</p>
     </div>
   </footer>
-  <script src="js/auth.js" defer></script>
+  <script src="js/auth.js?v=<?php echo filemtime(__DIR__ . '/js/auth.js'); ?>" defer></script>
 </body>
 </html>

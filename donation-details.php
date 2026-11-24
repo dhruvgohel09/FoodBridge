@@ -40,14 +40,9 @@ if ($id > 0) {
 $donation = $stmt->fetch();
 
 if (!$donation) {
-    // Fallback if not found for this specific user
-    $fallbackStmt = $db->query("SELECT d.*, c.name as city_name, o.name as org_name, o.short_code as org_code, o.address as org_address, o.phone as org_phone, o.description as org_desc, o.accepted_items as org_items, u.name as donor_name, u.phone as donor_phone
-                               FROM donations d
-                               LEFT JOIN cities c ON d.city_id = c.id
-                               LEFT JOIN organizations o ON d.organization_id = o.id
-                               LEFT JOIN users u ON d.user_id = u.id
-                               ORDER BY d.id DESC LIMIT 1");
-    $donation = $fallbackStmt->fetch();
+    setFlash('info', 'No donation record found. You can donate surplus food below.');
+    header('Location: my-donations.php');
+    exit;
 }
 
 // Handle Cancel action

@@ -33,12 +33,9 @@ if ($id > 0) {
 $request = $stmt->fetch();
 
 if (!$request) {
-    // Fallback if not found
-    $fallbackStmt = $db->query("SELECT r.*, o.name as org_name, o.phone as org_phone, o.address as org_address
-                                FROM food_requests r
-                                LEFT JOIN organizations o ON r.assigned_org_id = o.id
-                                ORDER BY r.id DESC LIMIT 1");
-    $request = $fallbackStmt->fetch();
+    setFlash('info', 'No food request found. You can submit a request below.');
+    header('Location: my-requests.php');
+    exit;
 }
 
 // Handle Cancel action

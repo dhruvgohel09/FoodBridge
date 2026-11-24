@@ -1,23 +1,35 @@
 <?php
 require_once __DIR__ . '/config/db.php';
 require_once __DIR__ . '/config/auth.php';
+require_once __DIR__ . '/config/mailer.php';
 
 requireLogin();
 
 $user = currentUser();
-$error = '';
+$errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $food_type = sanitize($_POST['food_type'] ?? '');
     $dietary_category = sanitize($_POST['dietary_category'] ?? 'Vegetarian');
-    $people_count = intval($_POST['people_count'] ?? 1);
-    $city = sanitize($_POST['city'] ?? 'Rajkot');
-    $required_date = sanitize($_POST['required_date'] ?? date('Y-m-d'));
+    $people_count = intval($_POST['people_count'] ?? 0);
+    $city = sanitize($_POST['city'] ?? '');
+    $required_date = sanitize($_POST['required_date'] ?? '');
     $notes = sanitize($_POST['notes'] ?? '');
 
-    if (empty($food_type) || $people_count < 1 || empty($city) || empty($required_date)) {
-        $error = 'Please fill out all required fields marked with *.';
-    } else {
+    if (empty($food_type)) {
+        $errors['food_type'] = 'Please select requested food type.';
+    }
+    if ($people_count < 1) {
+        $errors['people_count'] = 'Number of people must be at least 1.';
+    }
+    if (empty($city)) {
+        $errors['city'] = 'Please select your city.';
+    }
+    if (empty($required_date)) {
+        $errors['required_date'] = 'Required date is required.';
+    }
+
+    if (empty($errors)) {
         $db = getDB();
         // Generate unique request code
         $countStmt = $db->query("SELECT COUNT(*) FROM food_requests");
@@ -32,6 +44,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $db->prepare("INSERT INTO food_requests (request_code, user_id, food_type, dietary_category, people_count, city, required_date, notes, assigned_org_id, contact_window, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Today, 1:30 PM', 'Pending')");
         try {
             $stmt->execute([$requestCode, $user['id'], $food_type, $dietary_category, $people_count, $city, $required_date, $notes, $assignedOrgId]);
+
+            // Send food request confirmation email to user
+            if (!empty($user['email'])) {
+                sendFoodRequestConfirmationEmail(
+                    $user['email'],
+                    $user['name'],
+                    $requestCode,
+                    $food_type,
+                    $people_count,
+                    $city
+                );
+            }
+
             setFlash('success', "Your food request ({$requestCode}) has been successfully submitted! Community hubs will be alerted.");
             header('Location: my-requests.php');
             exit;
@@ -52,9 +77,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="css/app-header.css">
-  <link rel="stylesheet" href="css/need-food.css">
+  <link rel="stylesheet" href="css/style.css?v=<?php echo filemtime(__DIR__ . '/css/style.css'); ?>">
+  <link rel="stylesheet" href="css/app-header.css?v=<?php echo filemtime(__DIR__ . '/css/app-header.css'); ?>">
+  <link rel="stylesheet" href="css/need-food.css?v=<?php echo filemtime(__DIR__ . '/css/need-food.css'); ?>">
 </head>
 <body class="need-food-page">
   <?php $activeHeaderPage = 'need'; include __DIR__ . '/includes/app-header.php'; ?>
@@ -77,51 +102,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <span class="stigma-pill"><i class="fa-solid fa-shield-heart"></i> Zero Stigma • 100% Free Service</span>
       </header>
 
-      <?php if (!empty($error)): ?>
-        <div style="background: #fde8e8; color: #9b1c1c; padding: 14px 18px; border-radius: 12px; margin-bottom: 20px; font-size: 0.95rem; border: 1px solid #f8b4b4;">
-          <i class="fa-solid fa-triangle-exclamation"></i> <?php echo htmlspecialchars($error); ?>
-        </div>
-      <?php endif; ?>
-
-      <div class="need-food-layout">
-        <aside class="need-food-support">
-          <div class="support-photo">
-            <img src="https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=1200&q=80" alt="Community meal support">
-            <div class="support-photo-overlay">
-              <span class="mini-badge">Food Bridge</span>
-              <strong>Community Kitchen Relief</strong>
-              <small><?php echo htmlspecialchars($user['city'] ?? 'Rajkot'); ?> Community Center</small>
-            </div>
-          </div>
-
-          <div class="request-process">
-            <h2><i class="fa-solid fa-hand-holding-heart"></i> How Food Request Works</h2>
-            <ol>
-              <li>
-                <span class="step-number">1</span>
-                <div>
-                  <strong>Submit Request</strong>
-                  <p>Fill in your food type, number of people, and your city.</p>
-                </div>
-              </li>
-              <li>
-                <span class="step-number">2</span>
-                <div>
-                  <strong>Admin &amp; Partner Audit</strong>
-                  <p>Community volunteers or local kitchens check available surplus meals.</p>
-                </div>
-              </li>
-              <li>
-                <span class="step-number">3</span>
-                <div>
-                  <strong>Hand off &amp; Collect</strong>
-                  <p>Receive support from the nearest verified community hub or meal center.</p>
-                </div>
-              </li>
-            </ol>
-          </div>
-        </aside>
-
         <section class="request-form-panel" aria-label="Food request form">
           <div class="form-header">
             <h2>Food Request Details</h2>
@@ -129,17 +109,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           </div>
           <p class="form-subtitle">Please enter your requirements below to help us coordinate appropriate meals.</p>
 
-          <form class="food-request-form" action="need-food.php" method="POST">
+          <form class="food-request-form" action="need-food.php" method="POST" novalidate>
             <div class="fields-row two-columns">
               <label class="form-field">
                 <span>Food Type <b>*</b></span>
-                <select name="food_type" required>
+                <select class="<?php echo isset($errors['food_type']) ? 'has-error' : ''; ?>" name="food_type" required>
                   <option value="">Select food type...</option>
                   <option value="Cooked Food" selected>Cooked Food (Rice, Roti, Dal, Sabzi)</option>
                   <option value="Dry Ration">Dry Ration (Wheat, Rice, Pulses)</option>
                   <option value="Fresh Produce">Fresh Produce (Vegetables, Fruits)</option>
                   <option value="Ready-to-Eat Meals">Ready-to-Eat Packed Meals</option>
                 </select>
+                <?php if (!empty($errors['food_type'])): ?>
+                  <span class="field-error-text"><?php echo htmlspecialchars($errors['food_type']); ?></span>
+                <?php endif; ?>
               </label>
 
               <label class="form-field">
@@ -154,13 +137,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="fields-row two-columns">
               <label class="form-field">
                 <span>Number of People <b>*</b></span>
-                <input type="number" name="people_count" min="1" max="500" value="4" placeholder="4" required>
-                <small>How many individuals will this request feed?</small>
+                <input class="<?php echo isset($errors['people_count']) ? 'has-error' : ''; ?>" type="number" name="people_count" min="1" max="500" value="4" placeholder="4" required>
+                <?php if (!empty($errors['people_count'])): ?>
+                  <span class="field-error-text"><?php echo htmlspecialchars($errors['people_count']); ?></span>
+                <?php else: ?>
+                  <small>How many individuals will this request feed?</small>
+                <?php endif; ?>
               </label>
 
               <label class="form-field">
                 <span>City <b>*</b></span>
-                <select name="city" required>
+                <select class="<?php echo isset($errors['city']) ? 'has-error' : ''; ?>" name="city" required>
                   <?php
                   $cities = ['Rajkot', 'Ahmedabad', 'Surat', 'Vadodara', 'Junagadh', 'Bhavnagar', 'Gandhinagar'];
                   $userCity = $user['city'] ?? 'Rajkot';
@@ -168,17 +155,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <option value="<?php echo $c; ?>" <?php echo $c === $userCity ? 'selected' : ''; ?>><?php echo $c; ?></option>
                   <?php endforeach; ?>
                 </select>
-                <small>Where would food be received or coordinated?</small>
+                <?php if (!empty($errors['city'])): ?>
+                  <span class="field-error-text"><?php echo htmlspecialchars($errors['city']); ?></span>
+                <?php else: ?>
+                  <small>Where would food be received or coordinated?</small>
+                <?php endif; ?>
               </label>
             </div>
 
             <label class="form-field">
               <span>Required Date <b>*</b></span>
-              <div class="input-icon-wrap">
+              <div class="input-icon-wrap <?php echo isset($errors['required_date']) ? 'has-error' : ''; ?>">
                 <i class="fa-regular fa-calendar"></i>
                 <input type="date" name="required_date" value="<?php echo date('Y-m-d'); ?>" required>
               </div>
-              <small>When do you need the food support?</small>
+              <?php if (!empty($errors['required_date'])): ?>
+                <span class="field-error-text"><?php echo htmlspecialchars($errors['required_date']); ?></span>
+              <?php else: ?>
+                <small>When do you need the food support?</small>
+              <?php endif; ?>
             </label>
 
             <label class="form-field">
@@ -223,6 +218,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
   </footer>
 
-  <script src="js/auth.js" defer></script>
+  <script src="js/auth.js?v=<?php echo filemtime(__DIR__ . '/js/auth.js'); ?>" defer></script>
 </body>
 </html>

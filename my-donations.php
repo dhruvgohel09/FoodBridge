@@ -46,10 +46,10 @@ $donations = $stmt->fetchAll();
 // Calculate total metrics for user
 $statStmt = $db->prepare("SELECT
     COUNT(*) as total,
-    SUM(CASE WHEN status = 'Pending' THEN 1 ELSE 0 END) as pending_cnt,
-    SUM(CASE WHEN status = 'Accepted' THEN 1 ELSE 0 END) as accepted_cnt,
-    SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END) as completed_cnt,
-    SUM(serves) as total_servings
+    COALESCE(SUM(CASE WHEN status = 'Pending' THEN 1 ELSE 0 END), 0) as pending_cnt,
+    COALESCE(SUM(CASE WHEN status = 'Accepted' THEN 1 ELSE 0 END), 0) as accepted_cnt,
+    COALESCE(SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END), 0) as completed_cnt,
+    COALESCE(SUM(serves), 0) as total_servings
     FROM donations WHERE user_id = ?");
 $statStmt->execute([$user['id']]);
 $stats = $statStmt->fetch() ?: ['total' => 0, 'pending_cnt' => 0, 'accepted_cnt' => 0, 'completed_cnt' => 0, 'total_servings' => 0];

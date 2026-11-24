@@ -6,7 +6,7 @@ requireLogin();
 
 $user = currentUser();
 $draft = $_SESSION['donation_draft'] ?? [];
-$error = '';
+$errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $food_name = sanitize($_POST['food_name'] ?? '');
@@ -18,9 +18,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $available_time = sanitize($_POST['available_time'] ?? '11:30');
     $notes = sanitize($_POST['notes'] ?? '');
 
-    if (empty($food_name) || empty($food_type) || $quantity <= 0 || $serves < 1) {
-        $error = 'Please fill out all required fields marked with * correctly.';
-    } else {
+    if (empty($food_name)) {
+        $errors['food_name'] = 'Food name is required.';
+    }
+    if (empty($food_type)) {
+        $errors['food_type'] = 'Please select a food category.';
+    }
+    if ($quantity <= 0) {
+        $errors['quantity'] = 'Quantity must be greater than zero.';
+    }
+    if ($serves < 1) {
+        $errors['serves'] = 'Servings count must be at least 1 person.';
+    }
+    if (empty($available_date)) {
+        $errors['available_date'] = 'Available date is required.';
+    }
+    if (empty($available_time)) {
+        $errors['available_time'] = 'Pickup time window is required.';
+    }
+
+    if (empty($errors)) {
         $photoPath = $draft['food_photo'] ?? null;
         if (isset($_FILES['food_photo']) && $_FILES['food_photo']['error'] === UPLOAD_ERR_OK) {
             $tmpName = $_FILES['food_photo']['tmp_name'];
@@ -62,9 +79,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-  <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="css/app-header.css">
-  <link rel="stylesheet" href="css/donate-food.css">
+  <link rel="stylesheet" href="css/style.css?v=<?php echo filemtime(__DIR__ . '/css/style.css'); ?>">
+  <link rel="stylesheet" href="css/app-header.css?v=<?php echo filemtime(__DIR__ . '/css/app-header.css'); ?>">
+  <link rel="stylesheet" href="css/donate-food.css?v=<?php echo filemtime(__DIR__ . '/css/donate-food.css'); ?>">
 </head>
 <body class="donate-food-page">
   <?php $activeHeaderPage = 'donate'; include __DIR__ . '/includes/app-header.php'; ?>
@@ -82,42 +99,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <div class="donate-step"><span class="step-icon">4</span><span><small>STEP 4</small><strong>Confirmation</strong></span></div>
     </section>
 
-    <?php if (!empty($error)): ?>
-      <div style="background: #fde8e8; color: #9b1c1c; padding: 14px 18px; border-radius: 12px; margin-bottom: 20px; font-size: 0.95rem; border: 1px solid #f8b4b4;">
-        <i class="fa-solid fa-triangle-exclamation"></i> <?php echo htmlspecialchars($error); ?>
-      </div>
-    <?php endif; ?>
-
-    <div class="donate-layout">
-      <aside class="donate-sidebar">
-        <article class="pledge-card">
-          <div class="pledge-photo">
-            <img src="https://images.unsplash.com/photo-1555244162-803834f70033?auto=format&fit=crop&w=900&q=85" alt="Fresh meals prepared for community sharing">
-            <span><i class="fa-solid fa-truck-fast" aria-hidden="true"></i> Community Nourishment</span>
-          </div>
-          <div class="pledge-copy">
-            <h2>Pledge Clean Surplus</h2>
-            <p>Every box of fresh, untouched food logged here gets routed directly to vetted local relief centers.</p>
-            <span class="pledge-proof"><i class="fa-regular fa-circle-check" aria-hidden="true"></i> 100% Fresh &amp; Zero Middlemen</span>
-          </div>
-        </article>
-        <article class="safety-checklist">
-          <h2><i class="fa-solid fa-shield-heart" aria-hidden="true"></i> Safety Checklist</h2>
-          <ul>
-            <li><i class="fa-regular fa-circle-check" aria-hidden="true"></i> Prepared within safe consumption window (4–6 hours)</li>
-            <li><i class="fa-regular fa-circle-check" aria-hidden="true"></i> Clean, food-grade packaging for all containers</li>
-            <li><i class="fa-regular fa-circle-check" aria-hidden="true"></i> No expired packaged or partially consumed food</li>
-          </ul>
-        </article>
-      </aside>
-
-      <form class="food-details-form" action="donate-food.php" method="POST" enctype="multipart/form-data">
+      <form class="food-details-form" action="donate-food.php" method="POST" enctype="multipart/form-data" novalidate>
         <div class="food-name-row">
           <label class="form-field food-name-field">
             <span>Food Name <b>*</b></span>
-            <input name="food_name" type="text" placeholder="e.g. Rice, Roti, Dal Tadka &amp; Vegetable Curry" value="<?php echo htmlspecialchars($draft['food_name'] ?? 'Rice, Roti, Dal & Vegetable Curry'); ?>" required>
+            <input class="<?php echo isset($errors['food_name']) ? 'has-error' : ''; ?>" name="food_name" type="text" placeholder="e.g. Rice, Roti, Dal Tadka &amp; Vegetable Curry" value="<?php echo htmlspecialchars($draft['food_name'] ?? 'Rice, Roti, Dal & Vegetable Curry'); ?>" required>
           </label>
-          <span class="form-hint">e.g., Prepared meal or ration kit</span>
+          <?php if (!empty($errors['food_name'])): ?>
+            <span class="field-error-text"><?php echo htmlspecialchars($errors['food_name']); ?></span>
+          <?php else: ?>
+            <span class="form-hint">e.g., Prepared meal or ration kit</span>
+          <?php endif; ?>
         </div>
         <div class="suggestions">
           <span>Suggestions:</span>
@@ -128,7 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
         <label class="form-field food-type-field">
           <span>Food Type <b>*</b></span>
-          <select name="food_type" required>
+          <select class="<?php echo isset($errors['food_type']) ? 'has-error' : ''; ?>" name="food_type" required>
             <option value="">Select category of food...</option>
             <?php
             $types = ['Prepared Meals', 'Cooked Food', 'Dry Ration', 'Fresh Produce', 'Packaged Food'];
@@ -137,12 +129,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               <option value="<?php echo $t; ?>" <?php echo $selectedType === $t ? 'selected' : ''; ?>><?php echo $t; ?></option>
             <?php endforeach; ?>
           </select>
+          <?php if (!empty($errors['food_type'])): ?>
+            <span class="field-error-text"><?php echo htmlspecialchars($errors['food_type']); ?></span>
+          <?php endif; ?>
         </label>
         <div class="form-grid three-columns">
           <label class="form-field">
             <span>Quantity &amp; Unit <b>*</b></span>
             <span class="quantity-control">
-              <input name="quantity" type="number" min="1" step="0.5" value="<?php echo htmlspecialchars($draft['quantity'] ?? '25'); ?>" placeholder="25" required>
+              <input class="<?php echo isset($errors['quantity']) ? 'has-error' : ''; ?>" name="quantity" type="number" min="1" step="0.5" value="<?php echo htmlspecialchars($draft['quantity'] ?? '25'); ?>" placeholder="25" required>
               <select name="unit" aria-label="Quantity unit">
                 <?php
                 $units = ['Meals', 'Kg', 'Boxes'];
@@ -152,18 +147,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <?php endforeach; ?>
               </select>
             </span>
+            <?php if (!empty($errors['quantity'])): ?>
+              <span class="field-error-text"><?php echo htmlspecialchars($errors['quantity']); ?></span>
+            <?php endif; ?>
           </label>
           <label class="form-field">
             <span>Serves (Approx. People) <b>*</b></span>
-            <input name="serves" type="number" min="1" value="<?php echo htmlspecialchars($draft['serves'] ?? '25'); ?>" placeholder="e.g. 25 people" required>
+            <input class="<?php echo isset($errors['serves']) ? 'has-error' : ''; ?>" name="serves" type="number" min="1" value="<?php echo htmlspecialchars($draft['serves'] ?? '25'); ?>" placeholder="e.g. 25 people" required>
+            <?php if (!empty($errors['serves'])): ?>
+              <span class="field-error-text"><?php echo htmlspecialchars($errors['serves']); ?></span>
+            <?php endif; ?>
           </label>
           <label class="form-field">
             <span>Available Date <b>*</b></span>
-            <input name="available_date" type="date" value="<?php echo htmlspecialchars($draft['available_date'] ?? date('Y-m-d')); ?>" required>
+            <input class="<?php echo isset($errors['available_date']) ? 'has-error' : ''; ?>" name="available_date" type="date" value="<?php echo htmlspecialchars($draft['available_date'] ?? date('Y-m-d')); ?>" required>
+            <?php if (!empty($errors['available_date'])): ?>
+              <span class="field-error-text"><?php echo htmlspecialchars($errors['available_date']); ?></span>
+            <?php endif; ?>
           </label>
           <label class="form-field">
             <span>Available Time (Pickup window) <b>*</b></span>
-            <input name="available_time" type="time" value="<?php echo htmlspecialchars($draft['available_time'] ?? '12:30'); ?>" required>
+            <input class="<?php echo isset($errors['available_time']) ? 'has-error' : ''; ?>" name="available_time" type="time" value="<?php echo htmlspecialchars($draft['available_time'] ?? '12:30'); ?>" required>
+            <?php if (!empty($errors['available_time'])): ?>
+              <span class="field-error-text"><?php echo htmlspecialchars($errors['available_time']); ?></span>
+            <?php endif; ?>
           </label>
         </div>
         <div class="photo-field">
@@ -202,7 +209,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <p>Community Food Sharing across Gujarat</p>
     </div>
   </footer>
-  <script src="js/auth.js" defer></script>
-  <script src="js/donate-food.js" defer></script>
+  <script src="js/auth.js?v=<?php echo filemtime(__DIR__ . '/js/auth.js'); ?>" defer></script>
+  <script src="js/donate-food.js?v=<?php echo filemtime(__DIR__ . '/js/donate-food.js'); ?>" defer></script>
 </body>
 </html>
